@@ -8,8 +8,10 @@ import lombok.Data;
  */
 @Data
 public class LoginRequest {
-    
-    // TODO: 添加 @NotBlank 注解
+
+    @NotBlank(message = "用户名不能为空")
     private String username;
+
+    @NotBlank(message = "密码不能为空")
     private String password;
 }

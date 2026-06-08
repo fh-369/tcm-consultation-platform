@@ -9,16 +9,15 @@ import lombok.Data;
  */
 @Data
 public class RegisterRequest {
-    
-    // TODO: 添加校验注解
-    // @NotBlank(message = "用户名不能为空")
-    // @Size(min = 3, message = "用户名至少3位")
+
+    @NotBlank(message = "用户名不能为空")
+    @Size(min = 3, message = "用户名至少3位")
     private String username;
-    
-    // @NotBlank(message = "密码不能为空")
-    // @Size(min = 6, message = "密码至少6位")
+
+    @NotBlank(message = "密码不能为空")
+    @Size(min = 6, message = "密码至少6位")
     private String password;
-    
+
     private String displayName;
     private String phone;
 }
