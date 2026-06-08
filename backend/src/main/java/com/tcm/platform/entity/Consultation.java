@@ -14,25 +14,42 @@ public class Consultation {
     
     @TableId(type = IdType.AUTO)
     private Long id;
-    
-    // TODO: 添加以下字段
-    // - patientAccountId (Long, FK)
-    // - patientName (String, 必填)
-    // - age (Integer)
-    // - gender (String: 男/女/其他)
-    // - phone (String)
-    // - symptoms (String, 必填)
-    // - duration (String)
-    // - allergyHistory (String)
-    // - urgency (String: 普通/紧急/非常紧急)
-    // - patientNote (String)
-    // - reminderLevel (String: normal/attention/urgent)
-    // - reminderText (String)
-    // - status (String: 待接诊/接诊中/已完成)
-    // - doctorNote (String)
-    // - doctorId (Long, FK)
-    // - followUpAt (LocalDateTime)
-    // - createdAt (INSERT), updatedAt (INSERT_UPDATE)
-    
-    
+
+    private Long patientAccountId;
+
+    private String patientName;
+
+    private Integer age;
+
+    private String gender;
+
+    private String phone;
+
+    private String symptoms;
+
+    private String duration;
+
+    private String allergyHistory;
+
+    private String urgency;
+
+    private String patientNote;
+
+    private String reminderLevel;
+
+    private String reminderText;
+
+    private String status;
+
+    private String doctorNote;
+
+    private Long doctorId;
+
+    private LocalDateTime followUpAt;
+
+    @TableField(fill = FieldFill.INSERT)
+    private LocalDateTime createdAt;
+
+    @TableField(fill = FieldFill.INSERT_UPDATE)
+    private LocalDateTime updatedAt;
 }

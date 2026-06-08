@@ -14,15 +14,20 @@ public class User {
     
     @TableId(type = IdType.AUTO)
     private Long id;
-    
-    // TODO: 添加以下字段（参考数据库表结构）
-    // - username (VARCHAR 50, 唯一)
-    // - passwordHash (VARCHAR 255, BCrypt 加密)
-    // - role (ENUM: admin/doctor)
-    // - displayName (VARCHAR 100)
-    // - department (VARCHAR 100)
-    // - createdAt (DATETIME, 自动填充 INSERT)
-    // - updatedAt (DATETIME, 自动填充 INSERT_UPDATE)
-    
-    
+
+    private String username;
+
+    private String passwordHash;
+
+    private String role;
+
+    private String displayName;
+
+    private String department;
+
+    @TableField(fill = FieldFill.INSERT)
+    private LocalDateTime createdAt;
+
+    @TableField(fill = FieldFill.INSERT_UPDATE)
+    private LocalDateTime updatedAt;
 }

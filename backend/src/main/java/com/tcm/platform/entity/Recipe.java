@@ -13,12 +13,30 @@ public class Recipe {
     
     @TableId(type = IdType.AUTO)
     private Long id;
-    
-    // TODO: 添加以下字段
-    // - name, season (春/夏/秋/冬/四季), constitution
-    // - suitableFor, summary, ingredients (JSON), steps (JSON)
-    // - imageUrl, published (Boolean), viewCount (Integer)
-    // - createdAt (INSERT), updatedAt (INSERT_UPDATE)
-    
-    
+
+    private String name;
+
+    private String season;
+
+    private String constitution;
+
+    private String suitableFor;
+
+    private String summary;
+
+    private String ingredients;
+
+    private String steps;
+
+    private String imageUrl;
+
+    private Boolean published;
+
+    private Integer viewCount;
+
+    @TableField(fill = FieldFill.INSERT)
+    private LocalDateTime createdAt;
+
+    @TableField(fill = FieldFill.INSERT_UPDATE)
+    private LocalDateTime updatedAt;
 }
