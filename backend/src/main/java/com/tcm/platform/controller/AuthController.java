@@ -1,5 +1,6 @@
 package com.tcm.platform.controller;
 
+import com.tcm.platform.common.Result;
 import com.tcm.platform.dto.LoginRequest;
 import com.tcm.platform.dto.LoginResponse;
 import com.tcm.platform.dto.RegisterRequest;
@@ -24,17 +25,17 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public LoginResponse register(@Valid @RequestBody RegisterRequest request) {
-        return authService.registerPatient(request);
+    public Result<LoginResponse> register(@Valid @RequestBody RegisterRequest request) {
+        return Result.success("注册成功", authService.registerPatient(request));
     }
 
     @PostMapping("/login/patient")
-    public LoginResponse loginPatient(@Valid @RequestBody LoginRequest request) {
-        return authService.loginPatient(request);
+    public Result<LoginResponse> loginPatient(@Valid @RequestBody LoginRequest request) {
+        return Result.success(authService.loginPatient(request));
     }
 
     @PostMapping("/login/admin")
-    public LoginResponse loginAdmin(@Valid @RequestBody LoginRequest request) {
-        return authService.loginAdmin(request);
+    public Result<LoginResponse> loginAdmin(@Valid @RequestBody LoginRequest request) {
+        return Result.success(authService.loginAdmin(request));
     }
 }

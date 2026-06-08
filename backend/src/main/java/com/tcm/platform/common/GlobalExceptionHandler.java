@@ -27,11 +27,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public Result<Void> handleValidationException(MethodArgumentNotValidException ex) {
-        // TODO: 从 ex.getBindingResult().getFieldErrors() 中提取错误消息
-        // 提示：使用 stream().map(FieldError::getDefaultMessage).collect(Collectors.joining(", "))
-        // 然后返回 Result.error(400, message)
-        
-        return null; // 替换为你的实现
+        String message = ex.getBindingResult()
+                .getFieldErrors()
+                .stream()
+                .map(FieldError::getDefaultMessage)
+                .collect(Collectors.joining(", "));
+        return Result.error(400, message);
     }
     
     /**
@@ -41,9 +42,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public Result<Void> handleIllegalArgument(IllegalArgumentException ex) {
-        // TODO: 返回 Result.error(400, ex.getMessage())
-        
-        return null; // 替换为你的实现
+        return Result.error(400, ex.getMessage());
     }
     
     /**
@@ -52,9 +51,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(RuntimeException.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public Result<Void> handleRuntimeException(RuntimeException ex) {
-        // TODO: 打印错误日志（System.err.println 或后续使用 @Slf4j）
-        // 然后返回 Result.error(500, "系统内部错误")
-        
-        return null; // 替换为你的实现
+        System.err.println(ex.getClass().getSimpleName() + ": " + ex.getMessage());
+        return Result.error(500, "系统内部错误");
     }
 }

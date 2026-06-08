@@ -17,51 +17,46 @@ import java.time.LocalDateTime;
  */
 @Data
 public class Result<T> {
-    
-    // TODO: 定义字段 code, message, data, timestamp
-    
-    
-    
-    
-    
+
+    private int code;
+    private String message;
+    private T data;
+    private LocalDateTime timestamp;
+
     /**
      * 成功响应（仅数据）
      */
     public static <T> Result<T> success(T data) {
-        // TODO: 实现此方法
-        // 1. 创建 Result 实例
-        // 2. 设置 code = 200
-        // 3. 设置 message = "success"
-        // 4. 设置 data 和 timestamp
-        // 5. 返回 result
-        
-        return null; // 替换为你的实现
+        return success("success", data);
     }
     
     /**
      * 成功响应（自定义消息 + 数据）
      */
     public static <T> Result<T> success(String message, T data) {
-        // TODO: 实现此方法（参考上面的 success 方法）
-        
-        return null; // 替换为你的实现
+        Result<T> result = new Result<>();
+        result.setCode(200);
+        result.setMessage(message);
+        result.setData(data);
+        result.setTimestamp(LocalDateTime.now());
+        return result;
     }
     
     /**
      * 错误响应（指定错误码和消息）
      */
     public static <T> Result<T> error(int code, String message) {
-        // TODO: 实现此方法
-        
-        return null; // 替换为你的实现
+        Result<T> result = new Result<>();
+        result.setCode(code);
+        result.setMessage(message);
+        result.setTimestamp(LocalDateTime.now());
+        return result;
     }
     
     /**
      * 错误响应（默认 500）
      */
     public static <T> Result<T> error(String message) {
-        // TODO: 调用上面的 error(code, message) 方法，code 设为 500
-        
-        return null; // 替换为你的实现
+        return error(500, message);
     }
 }
