@@ -1,0 +1,9 @@
+/.superpowers/
+target/
+.idea/
+*.iml
+.vscode/
+uploads/
+.env
+frontend/node_modules/
+frontend/dist/
