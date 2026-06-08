@@ -120,8 +120,8 @@ CREATE TABLE uploads (
 
 -- 初始化默认管理员账号 (密码: admin123, BCrypt加密)
 INSERT INTO users (username, password_hash, role, display_name) VALUES
-('admin', '$2a$10$N9qo8uLOickgx2ZMRcpMy.g9CsMA1JX02.1YDH4j/QiKMH8eZTjqS', 'admin', '系统管理员');
+('admin', '$2a$10$dOmQRUxZF5udxjV651CP0ez4T0.iQNvC6BVZMZOCpY2WhZCscfWfO', 'admin', '系统管理员');
 
 -- 初始化默认医生账号 (密码: doctor123, BCrypt加密)
 INSERT INTO users (username, password_hash, role, display_name, department) VALUES
-('doctor1', '$2a$10$N9qo8uLOickgx2ZMRcpMy.g9CsMA1JX02.1YDH4j/QiKMH8eZTjqS', 'doctor', '张医生', '内科');
+('doctor1', '$2a$10$oBczDgrrscIsIBdZTBfQlOLNNnUTDf1665Hawnxn.BAtVgZOaizxG', 'doctor', '张医生', '内科');

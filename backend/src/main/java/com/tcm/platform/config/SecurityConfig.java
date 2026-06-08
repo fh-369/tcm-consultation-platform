@@ -3,6 +3,7 @@ package com.tcm.platform.config;
 import com.tcm.platform.security.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -40,23 +41,24 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        // TODO: 配置 SecurityFilterChain
-        // 提示：
-        // http
-        //     .csrf(AbstractHttpConfigurer::disable)
-        //     .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::disable))
-        //     .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-        //     .authorizeHttpRequests(auth -> auth
-        //         .requestMatchers("/api/auth/**").permitAll()
-        //         .requestMatchers("/api/patient/**").hasAnyRole("PATIENT", "DOCTOR", "ADMIN")
-        //         .requestMatchers("/api/admin/**").hasAnyRole("DOCTOR", "ADMIN")
-        //         .requestMatchers("/uploads/**").permitAll()
-        //         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
-        //         .anyRequest().authenticated()
-        //     )
-        //     .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
-        // return http.build();
-        
-        throw new UnsupportedOperationException("TODO: 实现 securityFilterChain 配置");
+        http
+                .cors(Customizer.withDefaults())
+                .csrf(AbstractHttpConfigurer::disable)
+                .httpBasic(AbstractHttpConfigurer::disable)
+                .formLogin(AbstractHttpConfigurer::disable)
+                .logout(AbstractHttpConfigurer::disable)
+                .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::disable))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/patient/**").hasAnyRole("PATIENT", "DOCTOR", "ADMIN")
+                        .requestMatchers("/api/admin/**").hasAnyRole("DOCTOR", "ADMIN")
+                        .requestMatchers("/uploads/**").permitAll()
+                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                        .anyRequest().authenticated()
+                )
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
     }
 }

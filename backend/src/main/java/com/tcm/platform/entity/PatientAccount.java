@@ -14,10 +14,20 @@ public class PatientAccount {
     
     @TableId(type = IdType.AUTO)
     private Long id;
-    
-    // TODO: 添加以下字段
-    // - username, passwordHash, displayName, phone, avatarUrl
-    // - createdAt (INSERT), updatedAt (INSERT_UPDATE)
-    
-    
+
+    private String username;
+
+    private String passwordHash;
+
+    private String displayName;
+
+    private String phone;
+
+    private String avatarUrl;
+
+    @TableField(fill = FieldFill.INSERT)
+    private LocalDateTime createdAt;
+
+    @TableField(fill = FieldFill.INSERT_UPDATE)
+    private LocalDateTime updatedAt;
 }

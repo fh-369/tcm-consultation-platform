@@ -13,11 +13,26 @@ public class KnowledgeArticle {
     
     @TableId(type = IdType.AUTO)
     private Long id;
-    
-    // TODO: 添加以下字段
-    // - title, category, summary, content, tips
-    // - coverImageUrl, published (Boolean), viewCount (Integer)
-    // - createdAt (INSERT), updatedAt (INSERT_UPDATE)
-    
-    
+
+    private String title;
+
+    private String category;
+
+    private String summary;
+
+    private String content;
+
+    private String tips;
+
+    private String coverImageUrl;
+
+    private Boolean published;
+
+    private Integer viewCount;
+
+    @TableField(fill = FieldFill.INSERT)
+    private LocalDateTime createdAt;
+
+    @TableField(fill = FieldFill.INSERT_UPDATE)
+    private LocalDateTime updatedAt;
 }

@@ -21,8 +21,7 @@ public class AppConfig {
      */
     @Bean
     public PasswordEncoder passwordEncoder() {
-        // TODO: 返回 new BCryptPasswordEncoder()
-        return null;
+        return new BCryptPasswordEncoder();
     }
     
     /**
@@ -30,7 +29,6 @@ public class AppConfig {
      */
     @Bean
     public RestTemplate restTemplate() {
-        // TODO: 返回 new RestTemplate()
-        return null;
+        return new RestTemplate();
     }
 }

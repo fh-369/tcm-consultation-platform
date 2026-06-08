@@ -13,11 +13,19 @@ public class Upload {
     
     @TableId(type = IdType.AUTO)
     private Long id;
-    
-    // TODO: 添加以下字段
-    // - originalName, storedName, mimeType, fileSize
-    // - accessUrl, uploadedBy
-    // - createdAt (INSERT)
-    
-    
+
+    private String originalName;
+
+    private String storedName;
+
+    private String mimeType;
+
+    private Long fileSize;
+
+    private String accessUrl;
+
+    private Long uploadedBy;
+
+    @TableField(fill = FieldFill.INSERT)
+    private LocalDateTime createdAt;
 }
