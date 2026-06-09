@@ -1,4 +1,11 @@
 <script setup>
+import { useRouter } from 'vue-router'
+
+import { useAuthStore } from '../stores/auth'
+
+const auth = useAuthStore()
+const router = useRouter()
+
 const navigation = [
   { label: '首页', to: '/' },
   { label: '在线问诊', to: '/consultation/new' },
@@ -6,6 +13,11 @@ const navigation = [
   { label: '药膳推荐', to: '/recipes' },
   { label: '我的', to: '/profile' },
 ]
+
+async function logout() {
+  auth.logout()
+  await router.push('/')
+}
 </script>
 
 <template>
@@ -24,6 +36,11 @@ const navigation = [
           <RouterLink v-for="item in navigation" :key="item.to" :to="item.to">
             {{ item.label }}
           </RouterLink>
+          <div v-if="auth.isPatient" class="patient-account">
+            <span>{{ auth.displayName || '患者用户' }}</span>
+            <button type="button" @click="logout">退出</button>
+          </div>
+          <RouterLink v-else class="login-link" to="/login/patient">登录</RouterLink>
         </nav>
       </div>
     </header>
@@ -106,6 +123,45 @@ const navigation = [
   gap: 4px;
 }
 
+.patient-account {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 7px;
+  margin-left: 5px;
+  padding-left: 11px;
+  border-left: 1px solid var(--color-border);
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.patient-account button {
+  min-height: 34px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-cinnabar);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.patient-account button:hover {
+  background: var(--color-cinnabar-soft);
+}
+
+.patient-nav .login-link {
+  margin-left: 5px;
+  background: var(--color-ink);
+  color: white;
+}
+
+.patient-nav .login-link:hover {
+  background: var(--color-ink-soft);
+  color: white;
+}
+
 .patient-nav a {
   display: inline-flex;
   min-height: 44px;
@@ -163,6 +219,10 @@ const navigation = [
   }
 
   .patient-nav a {
+    flex: 0 0 auto;
+  }
+
+  .patient-account {
     flex: 0 0 auto;
   }
 }
