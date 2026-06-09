@@ -65,4 +65,4 @@ VITE_API_BASE_URL=http://localhost:8080/api
 - `/admin/recipes`
 - `/admin/export`
 
-Frontend Phase 2 已加入患者登录、后台登录、患者注册、Pinia 登录会话、Bearer Token 请求头和角色路由守卫。真实问诊及内容接口联调属于后续阶段。
+Frontend Phase 3 已加入患者问诊提交、我的问诊记录、状态筛选和分页。内容接口与后台问诊管理属于后续阶段。
