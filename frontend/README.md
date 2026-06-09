@@ -1,13 +1,55 @@
 # Frontend
 
-此目录用于未来的患者端和后台管理前端。
+中医问诊与养生平台前端使用一个 Vue 应用承载患者端和后台端。
 
-当前尚未选择 Vue、React 或其他前端技术栈，因此暂不初始化前端工程。保留本说明文件可以让 Git 在第一次提交时记录 `frontend` 目录。
+## 技术栈
 
-开始前端开发前，应先明确：
+- Vue 3 + Vite
+- JavaScript
+- Vue Router
+- Pinia
+- Axios
+- Element Plus
 
-- 患者端和后台管理端是否使用同一个前端项目
-- 使用 Vue、React 或其他技术栈
-- 页面范围和接口依赖
-- 前端开发与后端 API 的联调方式
+## 本地运行
 
+```powershell
+npm install
+npm run dev
+```
+
+生产构建：
+
+```powershell
+npm run build
+```
+
+## 环境变量
+
+复制 `.env.example` 为本机 `.env` 后可修改后端地址：
+
+```text
+VITE_API_BASE_URL=http://localhost:8080/api
+```
+
+`.env` 不应提交到 Git。
+
+## Frontend Phase 1 路由
+
+患者端：
+
+- `/`
+- `/consultation/new`
+- `/knowledge`
+- `/recipes`
+- `/profile`
+
+后台端：
+
+- `/admin`
+- `/admin/consultations`
+- `/admin/knowledge`
+- `/admin/recipes`
+- `/admin/export`
+
+Phase 1 仅实现前端基础工程、患者顶部导航布局、后台侧边栏布局和占位页面。登录注册、token、权限路由、真实问诊及内容接口联调属于后续阶段。
