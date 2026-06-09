@@ -62,7 +62,8 @@ public class ConsultationService {
             long size,
             String status,
             String urgency,
-            Long patientAccountId
+            Long patientAccountId,
+            String keyword
     ) {
         validatePage(current, size);
         validateOptionalStatus(status);
@@ -72,6 +73,10 @@ public class ConsultationService {
         query.eq(hasText(status), Consultation::getStatus, status)
                 .eq(hasText(urgency), Consultation::getUrgency, urgency)
                 .eq(patientAccountId != null, Consultation::getPatientAccountId, patientAccountId)
+                .and(hasText(keyword), wrapper -> wrapper
+                        .like(Consultation::getPatientName, keyword)
+                        .or()
+                        .like(Consultation::getSymptoms, keyword))
                 .orderByDesc(Consultation::getCreatedAt);
 
         return consultationMapper.selectPage(new Page<>(current, size), query);

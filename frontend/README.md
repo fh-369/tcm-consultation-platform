@@ -65,4 +65,4 @@ VITE_API_BASE_URL=http://localhost:8080/api
 - `/admin/recipes`
 - `/admin/export`
 
-Frontend Phase 3 已加入患者问诊提交、我的问诊记录、状态筛选和分页。内容接口与后台问诊管理属于后续阶段。
+Frontend Phase 4 已加入真实后台工作台、问诊管理筛选、详情查看以及状态和医生备注更新。内容接口属于后续阶段。

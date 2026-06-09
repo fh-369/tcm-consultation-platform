@@ -102,7 +102,7 @@ const router = createRouter({
         {
           path: 'consultations',
           name: 'admin-consultations',
-          component: () => import('../views/admin/AdminPlaceholderView.vue'),
+          component: () => import('../views/admin/ConsultationManagementView.vue'),
           meta: { title: '问诊管理' },
         },
         {
