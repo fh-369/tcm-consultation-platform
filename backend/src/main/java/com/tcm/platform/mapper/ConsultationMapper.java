@@ -10,20 +10,18 @@ import java.util.Map;
 
 @Mapper
 public interface ConsultationMapper extends BaseMapper<Consultation> {
-    
-    // TODO: 添加以下 3 个自定义查询方法
-    
+
     /** 按状态统计问诊数量 */
-    // @Select("SELECT status, COUNT(*) as count FROM consultations GROUP BY status")
-    // List<Map<String, Object>> countByStatus();
+    @Select("SELECT status, COUNT(*) AS count FROM consultations GROUP BY status")
+    List<Map<String, Object>> countByStatus();
     
     /** 按紧急度统计问诊数量 */
-    // @Select("SELECT urgency, COUNT(*) as count FROM consultations GROUP BY urgency")
-    // List<Map<String, Object>> countByUrgency();
+    @Select("SELECT urgency, COUNT(*) AS count FROM consultations GROUP BY urgency")
+    List<Map<String, Object>> countByUrgency();
     
     /** 近 6 个月问诊趋势 */
-    // @Select("SELECT DATE_FORMAT(created_at, '%Y-%m') as month, COUNT(*) as count " +
-    //        "FROM consultations WHERE created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH) " +
-    //        "GROUP BY month ORDER BY month")
-    // List<Map<String, Object>> trendLast6Months();
+    @Select("SELECT DATE_FORMAT(created_at, '%Y-%m') AS month, COUNT(*) AS count " +
+            "FROM consultations WHERE created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH) " +
+            "GROUP BY month ORDER BY month")
+    List<Map<String, Object>> trendLast6Months();
 }
