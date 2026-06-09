@@ -44,7 +44,7 @@ async function logout() {
       <header class="admin-topbar">
         <div>
           <strong>问诊工作台</strong>
-          <small>静态布局预览</small>
+          <small>待办问诊优先处理</small>
         </div>
         <div class="account-placeholder">
           <span aria-hidden="true">医</span>

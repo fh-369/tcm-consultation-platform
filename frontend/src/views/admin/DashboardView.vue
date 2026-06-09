@@ -1,26 +1,68 @@
 <script setup>
-const metrics = [
-  { label: '待接诊', value: 18 },
-  { label: '紧急提醒', value: 3, urgent: true },
-  { label: '接诊中', value: 7 },
-  { label: '今日新增', value: 12 },
-]
+import { computed, onMounted, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 
-const priorityItems = [
-  { symptom: '胸痛伴呼吸困难', patient: '王女士', time: '5 分钟前', level: '紧急' },
-  { symptom: '持续失眠三周', patient: '李先生', time: '21 分钟前', level: '关注' },
-  { symptom: '脾胃不适伴胃痛', patient: '陈先生', time: '36 分钟前', level: '关注' },
-]
+import { getAdminConsultations } from '../../api/adminConsultation'
+import {
+  formatConsultationTime,
+  reminderDisplay,
+  urgencyDisplay,
+} from '../../features/consultation/display'
+
+const loading = ref(false)
+const consultations = ref([])
+
+const today = new Date().toISOString().slice(0, 10)
+const metrics = computed(() => [
+  { label: '待接诊', value: consultations.value.filter((item) => item.status === '待接诊').length },
+  {
+    label: '紧急提醒',
+    value: consultations.value.filter((item) => item.reminderLevel === 'urgent').length,
+    urgent: true,
+  },
+  { label: '接诊中', value: consultations.value.filter((item) => item.status === '接诊中').length },
+  {
+    label: '今日新增',
+    value: consultations.value.filter((item) => String(item.createdAt).startsWith(today)).length,
+  },
+])
+
+const priorityItems = computed(() =>
+  [...consultations.value]
+    .filter((item) => item.status !== '已完成')
+    .sort((left, right) => priority(right) - priority(left))
+    .slice(0, 6),
+)
+
+function priority(item) {
+  const reminderWeight = { urgent: 30, attention: 20, normal: 10 }
+  const urgencyWeight = { 非常紧急: 3, 紧急: 2, 普通: 1 }
+  return (reminderWeight[item.reminderLevel] || 0) + (urgencyWeight[item.urgency] || 0)
+}
+
+async function loadDashboard() {
+  loading.value = true
+  try {
+    const page = await getAdminConsultations({ current: 1, size: 100 })
+    consultations.value = page.records || []
+  } catch (error) {
+    ElMessage.error(error.response?.data?.message || error.message || '工作台加载失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(loadDashboard)
 </script>
 
 <template>
-  <section class="dashboard">
+  <section v-loading="loading" class="dashboard">
     <div class="dashboard-heading">
       <div>
-        <p>静态布局预览</p>
+        <p>按提醒等级和紧急程度排序</p>
         <h1>今日问诊</h1>
       </div>
-      <span>真实数据将在后续后台问诊阶段接入</span>
+      <span>当前工作台基于实时问诊数据汇总</span>
     </div>
 
     <div class="metrics">
@@ -33,25 +75,28 @@ const priorityItems = [
     <section class="priority-list">
       <header>
         <div>
-          <p>按提醒等级与提交时间排序</p>
+          <p>优先展示尚未完成的问诊</p>
           <h2>优先处理</h2>
         </div>
-        <RouterLink to="/admin/consultations">查看问诊管理</RouterLink>
+        <RouterLink to="/admin/consultations">进入问诊管理</RouterLink>
       </header>
 
-      <div class="table" role="table" aria-label="静态优先问诊列表">
+      <div class="table" role="table" aria-label="优先问诊列表">
         <div class="table-row table-head" role="row">
           <span>主要症状</span>
           <span>患者</span>
           <span>提交时间</span>
           <span>提醒</span>
         </div>
-        <div v-for="item in priorityItems" :key="item.symptom" class="table-row" role="row">
-          <strong>{{ item.symptom }}</strong>
-          <span>{{ item.patient }}</span>
-          <span>{{ item.time }}</span>
-          <span :class="['level', { urgent: item.level === '紧急' }]">{{ item.level }}</span>
+        <div v-for="item in priorityItems" :key="item.id" class="table-row" role="row">
+          <strong>{{ item.symptoms }}</strong>
+          <span>{{ item.patientName }}</span>
+          <span>{{ formatConsultationTime(item.createdAt) }}</span>
+          <span :class="['level', `level-${urgencyDisplay(item.urgency).tone}`]">
+            {{ reminderDisplay(item.reminderLevel).label }}
+          </span>
         </div>
+        <el-empty v-if="!loading && priorityItems.length === 0" description="暂无待处理问诊" />
       </div>
     </section>
   </section>
@@ -150,7 +195,7 @@ const priorityItems = [
 
 .table-row {
   display: grid;
-  grid-template-columns: 1.5fr 0.7fr 0.8fr 0.5fr;
+  grid-template-columns: 1.5fr 0.7fr 1fr 0.6fr;
   gap: 12px;
   align-items: center;
   min-height: 54px;
@@ -175,7 +220,8 @@ const priorityItems = [
   font-weight: 800;
 }
 
-.level.urgent {
+.level-attention,
+.level-urgent {
   background: var(--color-cinnabar-soft);
   color: #9f3f2e;
 }
@@ -190,19 +236,7 @@ const priorityItems = [
   }
 
   .table-row {
-    min-width: 620px;
-  }
-}
-
-@media (max-width: 560px) {
-  .dashboard-heading,
-  .priority-list header {
-    display: block;
-  }
-
-  .dashboard-heading > span {
-    display: block;
-    margin-top: 8px;
+    min-width: 700px;
   }
 }
 </style>
