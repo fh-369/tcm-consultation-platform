@@ -9,9 +9,9 @@ const router = useRouter()
 const navigation = [
   { label: '首页', to: '/' },
   { label: '在线问诊', to: '/consultation/new' },
+  { label: '我的问诊', to: '/consultation/my' },
   { label: '养生知识', to: '/knowledge' },
   { label: '药膳推荐', to: '/recipes' },
-  { label: '我的', to: '/profile' },
 ]
 
 async function logout() {

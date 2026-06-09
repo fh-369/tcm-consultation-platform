@@ -19,7 +19,7 @@ const router = createRouter({
         {
           path: 'consultation/new',
           name: 'consultation-new',
-          component: () => import('../views/patient/PatientPlaceholderView.vue'),
+          component: () => import('../views/patient/ConsultationFormView.vue'),
           meta: {
             title: '在线问诊',
             description: '患者问诊表单将在 Frontend Phase 3 接入真实接口。',
@@ -30,7 +30,7 @@ const router = createRouter({
         {
           path: 'consultation/my',
           name: 'consultation-my',
-          component: () => import('../views/patient/PatientPlaceholderView.vue'),
+          component: () => import('../views/patient/MyConsultationsView.vue'),
           meta: {
             title: '我的问诊',
             description: '患者问诊记录将在 Frontend Phase 3 接入真实接口。',
