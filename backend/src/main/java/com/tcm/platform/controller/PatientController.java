@@ -67,7 +67,7 @@ public class PatientController {
     ) {
         PatientAccount patient = currentPatient(authentication);
         return Result.success(
-                consultationService.listConsultations(current, size, status, urgency, patient.getId())
+                consultationService.listConsultations(current, size, status, urgency, patient.getId(), null)
         );
     }
 
