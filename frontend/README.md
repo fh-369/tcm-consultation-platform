@@ -24,6 +24,12 @@ npm run dev
 npm run build
 ```
 
+行为测试：
+
+```powershell
+npm test
+```
+
 ## 环境变量
 
 复制 `.env.example` 为本机 `.env` 后可修改后端地址：
@@ -34,15 +40,22 @@ VITE_API_BASE_URL=http://localhost:8080/api
 
 `.env` 不应提交到 Git。
 
-## Frontend Phase 1 路由
+## 当前路由
 
 患者端：
 
 - `/`
 - `/consultation/new`
+- `/consultation/my`
 - `/knowledge`
 - `/recipes`
 - `/profile`
+
+认证：
+
+- `/login/patient`
+- `/login/admin`
+- `/register`
 
 后台端：
 
@@ -52,4 +65,4 @@ VITE_API_BASE_URL=http://localhost:8080/api
 - `/admin/recipes`
 - `/admin/export`
 
-Phase 1 仅实现前端基础工程、患者顶部导航布局、后台侧边栏布局和占位页面。登录注册、token、权限路由、真实问诊及内容接口联调属于后续阶段。
+Frontend Phase 2 已加入患者登录、后台登录、患者注册、Pinia 登录会话、Bearer Token 请求头和角色路由守卫。真实问诊及内容接口联调属于后续阶段。

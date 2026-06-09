@@ -1,4 +1,11 @@
 <script setup>
+import { useRouter } from 'vue-router'
+
+import { useAuthStore } from '../stores/auth'
+
+const auth = useAuthStore()
+const router = useRouter()
+
 const navigation = [
   { label: '工作台', to: '/admin' },
   { label: '问诊管理', to: '/admin/consultations' },
@@ -6,6 +13,11 @@ const navigation = [
   { label: '药膳管理', to: '/admin/recipes' },
   { label: '数据导出', to: '/admin/export' },
 ]
+
+async function logout() {
+  auth.logout()
+  await router.replace('/login/admin')
+}
 </script>
 
 <template>
@@ -37,9 +49,10 @@ const navigation = [
         <div class="account-placeholder">
           <span aria-hidden="true">医</span>
           <div>
-            <strong>医生账号</strong>
-            <small>身份功能将在后续阶段接入</small>
+            <strong>{{ auth.displayName || '后台用户' }}</strong>
+            <small>{{ auth.role === 'admin' ? '管理员' : '医生' }}</small>
           </div>
+          <button type="button" @click="logout">退出</button>
         </div>
       </header>
 
@@ -173,6 +186,23 @@ const navigation = [
   background: var(--color-jade-light);
   color: var(--color-ink);
   font-weight: 800;
+}
+
+.account-placeholder button {
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: white;
+  color: var(--color-cinnabar);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.account-placeholder button:hover {
+  border-color: var(--color-cinnabar);
+  background: var(--color-cinnabar-soft);
 }
 
 .admin-main {

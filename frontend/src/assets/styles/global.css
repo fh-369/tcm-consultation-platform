@@ -109,6 +109,19 @@ a:focus-visible,
   transform: translateY(0);
 }
 
+.el-button--primary {
+  --el-button-bg-color: var(--color-cinnabar);
+  --el-button-border-color: var(--color-cinnabar);
+  --el-button-hover-bg-color: #ad402f;
+  --el-button-hover-border-color: #ad402f;
+  --el-button-active-bg-color: #963828;
+  --el-button-active-border-color: #963828;
+}
+
+.el-input {
+  --el-input-focus-border-color: var(--color-jade);
+}
+
 @media (max-width: 720px) {
   .page-container {
     width: min(calc(100% - 24px), var(--container-width));
