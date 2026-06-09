@@ -25,9 +25,11 @@ public class ConsultationService {
     private static final Set<String> VALID_STATUSES = Set.of("待接诊", "接诊中", "已完成");
 
     private final ConsultationMapper consultationMapper;
+    private final ReminderService reminderService;
 
-    public ConsultationService(ConsultationMapper consultationMapper) {
+    public ConsultationService(ConsultationMapper consultationMapper, ReminderService reminderService) {
         this.consultationMapper = consultationMapper;
+        this.reminderService = reminderService;
     }
 
     @Transactional
@@ -47,6 +49,7 @@ public class ConsultationService {
         consultation.setUrgency(urgency);
         consultation.setPatientNote(request.getPatientNote());
         consultation.setStatus(INITIAL_STATUS);
+        reminderService.applyReminder(consultation);
 
         if (consultationMapper.insert(consultation) != 1) {
             throw new IllegalStateException("创建问诊单失败");
