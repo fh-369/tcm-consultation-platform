@@ -1,0 +1,110 @@
+package com.tcm.platform.controller;
+
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.tcm.platform.common.Result;
+import com.tcm.platform.dto.ConsultationRequest;
+import com.tcm.platform.entity.Consultation;
+import com.tcm.platform.entity.KnowledgeArticle;
+import com.tcm.platform.entity.PatientAccount;
+import com.tcm.platform.entity.Recipe;
+import com.tcm.platform.mapper.KnowledgeArticleMapper;
+import com.tcm.platform.mapper.PatientAccountMapper;
+import com.tcm.platform.mapper.RecipeMapper;
+import com.tcm.platform.service.ConsultationService;
+import jakarta.validation.Valid;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+
+/**
+ * 患者提交问诊、查看个人问诊及浏览已发布内容的接口。
+ */
+@RestController
+@RequestMapping("/api/patient")
+public class PatientController {
+
+    private final ConsultationService consultationService;
+    private final PatientAccountMapper patientAccountMapper;
+    private final KnowledgeArticleMapper knowledgeArticleMapper;
+    private final RecipeMapper recipeMapper;
+
+    public PatientController(
+            ConsultationService consultationService,
+            PatientAccountMapper patientAccountMapper,
+            KnowledgeArticleMapper knowledgeArticleMapper,
+            RecipeMapper recipeMapper
+    ) {
+        this.consultationService = consultationService;
+        this.patientAccountMapper = patientAccountMapper;
+        this.knowledgeArticleMapper = knowledgeArticleMapper;
+        this.recipeMapper = recipeMapper;
+    }
+
+    @PostMapping("/consultation")
+    public Result<Consultation> createConsultation(
+            Authentication authentication,
+            @Valid @RequestBody ConsultationRequest request
+    ) {
+        PatientAccount patient = currentPatient(authentication);
+        request.setPatientAccountId(patient.getId());
+        return Result.success("问诊提交成功", consultationService.createConsultation(request));
+    }
+
+    @GetMapping("/consultation/my")
+    public Result<Page<Consultation>> listMyConsultations(
+            Authentication authentication,
+            @RequestParam(defaultValue = "1") long current,
+            @RequestParam(defaultValue = "10") long size,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String urgency
+    ) {
+        PatientAccount patient = currentPatient(authentication);
+        return Result.success(
+                consultationService.listConsultations(current, size, status, urgency, patient.getId())
+        );
+    }
+
+    @GetMapping("/knowledge")
+    public Result<List<KnowledgeArticle>> listPublishedKnowledge() {
+        return Result.success(
+                knowledgeArticleMapper.selectList(
+                        Wrappers.<KnowledgeArticle>lambdaQuery()
+                                .eq(KnowledgeArticle::getPublished, true)
+                                .orderByDesc(KnowledgeArticle::getCreatedAt)
+                )
+        );
+    }
+
+    @GetMapping("/recipe")
+    public Result<List<Recipe>> listPublishedRecipes() {
+        return Result.success(
+                recipeMapper.selectList(
+                        Wrappers.<Recipe>lambdaQuery()
+                                .eq(Recipe::getPublished, true)
+                                .orderByDesc(Recipe::getCreatedAt)
+                )
+        );
+    }
+
+    private PatientAccount currentPatient(Authentication authentication) {
+        if (authentication == null || authentication.getName() == null) {
+            throw new IllegalArgumentException("患者未登录");
+        }
+
+        PatientAccount patient = patientAccountMapper.selectOne(
+                Wrappers.<PatientAccount>lambdaQuery()
+                        .eq(PatientAccount::getUsername, authentication.getName())
+        );
+        if (patient == null) {
+            throw new IllegalArgumentException("当前登录账号不是患者账号");
+        }
+        return patient;
+    }
+}
