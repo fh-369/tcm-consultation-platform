@@ -9,8 +9,8 @@ import com.tcm.platform.entity.KnowledgeArticle;
 import com.tcm.platform.entity.PatientAccount;
 import com.tcm.platform.entity.Recipe;
 import com.tcm.platform.mapper.PatientAccountMapper;
-import com.tcm.platform.mapper.RecipeMapper;
 import com.tcm.platform.service.ConsultationService;
+import com.tcm.platform.service.RecipeService;
 import com.tcm.platform.service.KnowledgeArticleService;
 import jakarta.validation.Valid;
 import org.springframework.security.core.Authentication;
@@ -34,18 +34,18 @@ public class PatientController {
     private final ConsultationService consultationService;
     private final KnowledgeArticleService knowledgeArticleService;
     private final PatientAccountMapper patientAccountMapper;
-    private final RecipeMapper recipeMapper;
+    private final RecipeService recipeService;
 
     public PatientController(
             ConsultationService consultationService,
             KnowledgeArticleService knowledgeArticleService,
             PatientAccountMapper patientAccountMapper,
-            RecipeMapper recipeMapper
+            RecipeService recipeService
     ) {
         this.consultationService = consultationService;
         this.knowledgeArticleService = knowledgeArticleService;
         this.patientAccountMapper = patientAccountMapper;
-        this.recipeMapper = recipeMapper;
+        this.recipeService = recipeService;
     }
 
     @PostMapping("/consultation")
@@ -84,13 +84,12 @@ public class PatientController {
 
     @GetMapping("/recipe")
     public Result<List<Recipe>> listPublishedRecipes() {
-        return Result.success(
-                recipeMapper.selectList(
-                        Wrappers.<Recipe>lambdaQuery()
-                                .eq(Recipe::getPublished, true)
-                                .orderByDesc(Recipe::getCreatedAt)
-                )
-        );
+        return Result.success(recipeService.listPublishedRecipes());
+    }
+
+    @GetMapping("/recipe/{id}")
+    public Result<Recipe> getPublishedRecipe(@PathVariable Long id) {
+        return Result.success(recipeService.getPublishedRecipe(id));
     }
 
     private PatientAccount currentPatient(Authentication authentication) {
