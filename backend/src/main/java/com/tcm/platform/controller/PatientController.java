@@ -8,10 +8,10 @@ import com.tcm.platform.entity.Consultation;
 import com.tcm.platform.entity.KnowledgeArticle;
 import com.tcm.platform.entity.PatientAccount;
 import com.tcm.platform.entity.Recipe;
-import com.tcm.platform.mapper.KnowledgeArticleMapper;
 import com.tcm.platform.mapper.PatientAccountMapper;
 import com.tcm.platform.service.ConsultationService;
 import com.tcm.platform.service.RecipeService;
+import com.tcm.platform.service.KnowledgeArticleService;
 import jakarta.validation.Valid;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -32,19 +32,19 @@ import java.util.List;
 public class PatientController {
 
     private final ConsultationService consultationService;
+    private final KnowledgeArticleService knowledgeArticleService;
     private final PatientAccountMapper patientAccountMapper;
-    private final KnowledgeArticleMapper knowledgeArticleMapper;
     private final RecipeService recipeService;
 
     public PatientController(
             ConsultationService consultationService,
+            KnowledgeArticleService knowledgeArticleService,
             PatientAccountMapper patientAccountMapper,
-            KnowledgeArticleMapper knowledgeArticleMapper,
             RecipeService recipeService
     ) {
         this.consultationService = consultationService;
+        this.knowledgeArticleService = knowledgeArticleService;
         this.patientAccountMapper = patientAccountMapper;
-        this.knowledgeArticleMapper = knowledgeArticleMapper;
         this.recipeService = recipeService;
     }
 
@@ -74,13 +74,12 @@ public class PatientController {
 
     @GetMapping("/knowledge")
     public Result<List<KnowledgeArticle>> listPublishedKnowledge() {
-        return Result.success(
-                knowledgeArticleMapper.selectList(
-                        Wrappers.<KnowledgeArticle>lambdaQuery()
-                                .eq(KnowledgeArticle::getPublished, true)
-                                .orderByDesc(KnowledgeArticle::getCreatedAt)
-                )
-        );
+        return Result.success(knowledgeArticleService.listPublishedArticles());
+    }
+
+    @GetMapping("/knowledge/{id}")
+    public Result<KnowledgeArticle> getPublishedKnowledge(@PathVariable Long id) {
+        return Result.success(knowledgeArticleService.getPublishedArticle(id));
     }
 
     @GetMapping("/recipe")
