@@ -1,4 +1,14 @@
 <script setup>
+import {
+  ChatDotRound,
+  Clock,
+  DocumentAdd,
+  Food,
+  House,
+  Reading,
+  SwitchButton,
+  User,
+} from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 
 import { useAuthStore } from '../stores/auth'
@@ -7,12 +17,12 @@ const auth = useAuthStore()
 const router = useRouter()
 
 const navigation = [
-  { label: '首页', to: '/' },
-  { label: '在线问诊', to: '/consultation/new' },
-  { label: '我的问诊', to: '/consultation/my' },
-  { label: '养生知识', to: '/knowledge' },
-  { label: '药膳推荐', to: '/recipes' },
-  { label: 'AI 养生问答', to: '/ai/ask' },
+  { label: '首页', to: '/', icon: House },
+  { label: '在线问诊', to: '/consultation/new', icon: DocumentAdd },
+  { label: '我的问诊', to: '/consultation/my', icon: Clock },
+  { label: '养生知识', to: '/knowledge', icon: Reading },
+  { label: '药膳推荐', to: '/recipes', icon: Food },
+  { label: 'AI 问答', to: '/ai/ask', icon: ChatDotRound },
 ]
 
 async function logout() {
@@ -35,11 +45,15 @@ async function logout() {
 
         <nav class="patient-nav" aria-label="患者端主导航">
           <RouterLink v-for="item in navigation" :key="item.to" :to="item.to">
+            <el-icon><component :is="item.icon" /></el-icon>
             {{ item.label }}
           </RouterLink>
           <div v-if="auth.isPatient" class="patient-account">
-            <span>{{ auth.displayName || '患者用户' }}</span>
-            <button type="button" @click="logout">退出</button>
+            <span><el-icon><User /></el-icon>{{ auth.displayName || '用户' }}</span>
+            <button type="button" aria-label="退出登录" @click="logout">
+              <el-icon><SwitchButton /></el-icon>
+              退出
+            </button>
           </div>
           <RouterLink v-else class="login-link" to="/login">登录</RouterLink>
         </nav>
@@ -49,13 +63,6 @@ async function logout() {
     <main>
       <RouterView />
     </main>
-
-    <footer class="patient-footer">
-      <div class="page-container footer-inner">
-        <strong>知身问养</strong>
-        <span>清楚记录身体变化，安心了解问诊进度。</span>
-      </div>
-    </footer>
   </div>
 </template>
 
@@ -71,14 +78,15 @@ async function logout() {
   position: sticky;
   z-index: 20;
   top: 0;
-  border-bottom: 1px solid rgb(217 230 223 / 86%);
-  background: rgb(255 255 255 / 90%);
-  backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgb(23 60 45 / 8%);
+  background: rgb(250 252 250 / 88%);
+  box-shadow: 0 10px 34px rgb(23 60 45 / 5%);
+  backdrop-filter: blur(20px) saturate(145%);
 }
 
 .header-inner {
   display: flex;
-  min-height: 76px;
+  min-height: 82px;
   align-items: center;
   justify-content: space-between;
   gap: 24px;
@@ -92,8 +100,8 @@ async function logout() {
 }
 
 .brand-mark {
-  width: 38px;
-  height: 38px;
+  width: 42px;
+  height: 42px;
   object-fit: contain;
 }
 
@@ -103,6 +111,8 @@ async function logout() {
 }
 
 .brand strong {
+  font-family: "Noto Serif SC", serif;
+  font-size: 18px;
   letter-spacing: 0.08em;
 }
 
@@ -115,26 +125,39 @@ async function logout() {
 .patient-nav {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 7px;
 }
 
 .patient-account {
   display: inline-flex;
-  min-height: 38px;
+  min-height: 44px;
   align-items: center;
-  gap: 7px;
-  margin-left: 5px;
-  padding-left: 11px;
+  gap: 4px;
+  margin-left: 7px;
+  padding-left: 14px;
   border-left: 1px solid var(--color-border);
   color: var(--color-ink);
   font-size: 12px;
   font-weight: 700;
 }
 
+.patient-account > span,
 .patient-account button {
-  min-height: 34px;
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 9px;
+}
+
+.patient-account > span {
+  border-radius: 999px;
+  background: var(--color-jade-light);
+}
+
+.patient-account button {
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: 999px;
   background: transparent;
   color: var(--color-cinnabar);
   cursor: pointer;
@@ -147,7 +170,7 @@ async function logout() {
 }
 
 .patient-nav .login-link {
-  margin-left: 5px;
+  margin-left: 7px;
   background: var(--color-ink);
   color: white;
 }
@@ -161,45 +184,30 @@ async function logout() {
   display: inline-flex;
   min-height: 44px;
   align-items: center;
-  padding: 0 13px;
-  border-radius: var(--radius-sm);
+  gap: 7px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 999px;
   color: var(--color-text-muted);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
 }
 
-.patient-nav a:hover,
-.patient-nav a.router-link-exact-active {
+.patient-nav a:hover {
   background: var(--color-jade-light);
   color: var(--color-ink);
 }
 
-.patient-nav a.router-link-exact-active::after {
-  width: 5px;
-  height: 5px;
-  margin-left: 7px;
-  border-radius: 50%;
-  background: var(--color-cinnabar);
-  content: "";
+.patient-nav a.router-link-exact-active {
+  border-color: rgb(23 60 45 / 42%);
+  background: white;
+  color: var(--color-ink);
+  box-shadow: 0 5px 15px rgb(23 60 45 / 8%);
 }
 
-.patient-footer {
-  margin-top: 48px;
-  background: var(--color-ink);
-  color: rgb(255 255 255 / 72%);
-}
-
-.footer-inner {
-  display: flex;
-  min-height: 94px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-}
-
-.footer-inner strong {
-  color: white;
-  letter-spacing: 0.08em;
+.patient-nav .el-icon,
+.patient-account .el-icon {
+  font-size: 16px;
 }
 
 @media (max-width: 850px) {
@@ -227,10 +235,5 @@ async function logout() {
     display: none;
   }
 
-  .footer-inner {
-    display: grid;
-    justify-content: start;
-    padding-block: 22px;
-  }
 }
 </style>
