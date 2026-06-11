@@ -348,8 +348,8 @@ frontend/
 | 后台问诊管理 | `GET /api/admin/consultation`、`PUT /api/admin/consultation/{id}` |
 | 文章管理 | `/api/admin/knowledge[/{id}]` |
 | 药膳管理 | `/api/admin/recipe[/{id}]` |
-| CSV 导出 | `GET /api/admin/export/consultation` |
-| AI 问答 | `POST /api/ai/ask` |
+| CSV 导出 | `GET /api/admin/export/consultations` |
+| AI 问答 | `POST /api/patient/ai/question` |
 
 ## 13. 前端开发阶段
 
