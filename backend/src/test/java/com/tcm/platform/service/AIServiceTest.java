@@ -4,11 +4,21 @@ import com.tcm.platform.dto.AIAnswerResponse;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class AIServiceTest {
+
+    @Test
+    void answerRejectsBlankQuestion() {
+        AIService service = new AIService(mock(DashScopeClient.class), "");
+
+        assertThatThrownBy(() -> service.answer("  "))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("问题不能为空");
+    }
 
     @Test
     void answerUsesFallbackWhenApiKeyIsMissing() {
