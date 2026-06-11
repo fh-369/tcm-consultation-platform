@@ -78,10 +78,13 @@ async function logout() {
   position: sticky;
   z-index: 20;
   top: 0;
-  border-bottom: 1px solid rgb(23 60 45 / 8%);
-  background: rgb(250 252 250 / 88%);
-  box-shadow: 0 10px 34px rgb(23 60 45 / 5%);
-  backdrop-filter: blur(20px) saturate(145%);
+  border-bottom: 1px solid rgb(255 255 255 / 38%);
+  background:
+    linear-gradient(110deg, rgb(236 246 240 / 76%), rgb(218 236 226 / 68%));
+  box-shadow:
+    inset 0 -1px 0 rgb(31 92 66 / 8%),
+    0 12px 38px rgb(23 60 45 / 7%);
+  backdrop-filter: blur(24px) saturate(135%);
 }
 
 .header-inner {
@@ -135,7 +138,7 @@ async function logout() {
   gap: 4px;
   margin-left: 7px;
   padding-left: 14px;
-  border-left: 1px solid var(--color-border);
+  border-left: 1px solid rgb(255 255 255 / 62%);
   color: var(--color-ink);
   font-size: 12px;
   font-weight: 700;
@@ -148,17 +151,20 @@ async function logout() {
   align-items: center;
   gap: 5px;
   padding: 0 9px;
+  border: 1px solid rgb(255 255 255 / 64%);
+  border-radius: 999px;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 76%),
+    0 5px 16px rgb(23 60 45 / 6%);
+  backdrop-filter: blur(10px);
 }
 
 .patient-account > span {
-  border-radius: 999px;
-  background: var(--color-jade-light);
+  background: rgb(228 242 234 / 68%);
 }
 
 .patient-account button {
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
+  background: rgb(255 255 255 / 24%);
   color: var(--color-cinnabar);
   cursor: pointer;
   font-size: 11px;
@@ -166,7 +172,9 @@ async function logout() {
 }
 
 .patient-account button:hover {
-  background: var(--color-cinnabar-soft);
+  border-color: rgb(194 75 55 / 22%);
+  background: rgb(255 239 235 / 64%);
+  transform: translateY(-1px);
 }
 
 .patient-nav .login-link {
@@ -186,23 +194,44 @@ async function logout() {
   align-items: center;
   gap: 7px;
   padding: 0 14px;
-  border: 1px solid transparent;
+  border: 1px solid rgb(255 255 255 / 52%);
   border-radius: 999px;
+  background: rgb(255 255 255 / 18%);
   color: var(--color-text-muted);
   font-size: 13px;
   font-weight: 600;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 72%),
+    inset 0 -1px 0 rgb(36 103 74 / 5%),
+    0 5px 16px rgb(23 60 45 / 4%);
+  backdrop-filter: blur(10px);
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease;
 }
 
 .patient-nav a:hover {
-  background: var(--color-jade-light);
+  border-color: rgb(255 255 255 / 82%);
+  background: rgb(255 255 255 / 42%);
   color: var(--color-ink);
+  box-shadow:
+    inset 0 1px 0 white,
+    0 8px 20px rgb(23 60 45 / 8%);
+  transform: translateY(-1px);
 }
 
 .patient-nav a.router-link-exact-active {
-  border-color: rgb(23 60 45 / 42%);
-  background: white;
+  border-color: rgb(42 112 80 / 34%);
+  background:
+    radial-gradient(circle at 28% 12%, rgb(255 255 255 / 96%), transparent 35%),
+    rgb(244 250 246 / 72%);
   color: var(--color-ink);
-  box-shadow: 0 5px 15px rgb(23 60 45 / 8%);
+  box-shadow:
+    inset 0 1px 0 white,
+    inset 0 -1px 0 rgb(38 104 75 / 8%),
+    0 8px 22px rgb(23 60 45 / 10%);
 }
 
 .patient-nav .el-icon,
