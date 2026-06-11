@@ -1,6 +1,7 @@
 package com.tcm.platform.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 /**
@@ -9,6 +10,7 @@ import lombok.Data;
 @Data
 public class AIQuestionRequest {
     
-    // TODO: 添加 @NotBlank(message = "问题不能为空")
+    @NotBlank(message = "问题不能为空")
+    @Size(max = 500, message = "问题不能超过500字")
     private String question;
 }
