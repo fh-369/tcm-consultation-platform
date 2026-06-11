@@ -2,49 +2,17 @@
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 
-import { getAdminConsultations } from '../../api/adminConsultation'
-import {
-  formatConsultationTime,
-  reminderDisplay,
-  urgencyDisplay,
-} from '../../features/consultation/display'
+import { getDashboardSummary } from '../../api/content'
 
 const loading = ref(false)
-const consultations = ref([])
-
-const today = new Date().toISOString().slice(0, 10)
-const metrics = computed(() => [
-  { label: '待接诊', value: consultations.value.filter((item) => item.status === '待接诊').length },
-  {
-    label: '紧急提醒',
-    value: consultations.value.filter((item) => item.reminderLevel === 'urgent').length,
-    urgent: true,
-  },
-  { label: '接诊中', value: consultations.value.filter((item) => item.status === '接诊中').length },
-  {
-    label: '今日新增',
-    value: consultations.value.filter((item) => String(item.createdAt).startsWith(today)).length,
-  },
-])
-
-const priorityItems = computed(() =>
-  [...consultations.value]
-    .filter((item) => item.status !== '已完成')
-    .sort((left, right) => priority(right) - priority(left))
-    .slice(0, 6),
-)
-
-function priority(item) {
-  const reminderWeight = { urgent: 30, attention: 20, normal: 10 }
-  const urgencyWeight = { 非常紧急: 3, 紧急: 2, 普通: 1 }
-  return (reminderWeight[item.reminderLevel] || 0) + (urgencyWeight[item.urgency] || 0)
-}
+const summary = ref({ statusDistribution: [], urgencyDistribution: [], trendLast6Months: [] })
+const total = computed(() => summary.value.statusDistribution.reduce((sum, item) => sum + Number(item.value || 0), 0))
+const maxTrend = computed(() => Math.max(...summary.value.trendLast6Months.map((item) => Number(item.value || 0)), 1))
 
 async function loadDashboard() {
   loading.value = true
   try {
-    const page = await getAdminConsultations({ current: 1, size: 100 })
-    consultations.value = page.records || []
+    summary.value = await getDashboardSummary()
   } catch (error) {
     ElMessage.error(error.response?.data?.message || error.message || '工作台加载失败')
   } finally {
@@ -59,45 +27,43 @@ onMounted(loadDashboard)
   <section v-loading="loading" class="dashboard">
     <div class="dashboard-heading">
       <div>
-        <p>按提醒等级和紧急程度排序</p>
-        <h1>今日问诊</h1>
+        <p>问诊数据实时汇总</p>
+        <h1>运营概览</h1>
       </div>
-      <span>当前工作台基于实时问诊数据汇总</span>
+      <RouterLink to="/admin/export">导出问诊数据</RouterLink>
     </div>
 
     <div class="metrics">
-      <article v-for="metric in metrics" :key="metric.label" :class="{ urgent: metric.urgent }">
-        <span>{{ metric.label }}</span>
-        <strong>{{ metric.value }}</strong>
+      <article>
+        <span>问诊总量</span>
+        <strong>{{ total }}</strong>
+      </article>
+      <article v-for="item in summary.statusDistribution" :key="item.label">
+        <span>{{ item.label }}</span>
+        <strong>{{ item.value }}</strong>
       </article>
     </div>
 
+    <div class="dashboard-grid">
     <section class="priority-list">
       <header>
-        <div>
-          <p>优先展示尚未完成的问诊</p>
-          <h2>优先处理</h2>
-        </div>
-        <RouterLink to="/admin/consultations">进入问诊管理</RouterLink>
+        <div><p>状态构成</p><h2>问诊状态分布</h2></div>
       </header>
-
-      <div class="table" role="table" aria-label="优先问诊列表">
-        <div class="table-row table-head" role="row">
-          <span>主要症状</span>
-          <span>患者</span>
-          <span>提交时间</span>
-          <span>提醒</span>
+      <div class="distribution">
+        <div v-for="item in summary.statusDistribution" :key="item.label">
+          <span>{{ item.label }}</span><strong>{{ item.value }}</strong>
+          <i :style="{ width: `${total ? Number(item.value) / total * 100 : 0}%` }"></i>
         </div>
-        <div v-for="item in priorityItems" :key="item.id" class="table-row" role="row">
-          <strong>{{ item.symptoms }}</strong>
-          <span>{{ item.patientName }}</span>
-          <span>{{ formatConsultationTime(item.createdAt) }}</span>
-          <span :class="['level', `level-${urgencyDisplay(item.urgency).tone}`]">
-            {{ reminderDisplay(item.reminderLevel).label }}
-          </span>
-        </div>
-        <el-empty v-if="!loading && priorityItems.length === 0" description="暂无待处理问诊" />
       </div>
+    </section>
+    <section class="priority-list">
+      <header><div><p>风险观察</p><h2>紧急程度分布</h2></div></header>
+      <div class="distribution urgency"><div v-for="item in summary.urgencyDistribution" :key="item.label"><span>{{ item.label }}</span><strong>{{ item.value }}</strong><i :style="{ width: `${total ? Number(item.value) / total * 100 : 0}%` }"></i></div></div>
+    </section>
+    </div>
+    <section class="priority-list trend">
+      <header><div><p>最近六个月</p><h2>问诊趋势</h2></div></header>
+      <div class="trend-chart"><div v-for="item in summary.trendLast6Months" :key="item.label"><strong>{{ item.value }}</strong><i :style="{ height: `${Math.max(Number(item.value) / maxTrend * 150, 4)}px` }"></i><span>{{ item.label }}</span></div></div>
     </section>
   </section>
 </template>
@@ -128,9 +94,10 @@ onMounted(loadDashboard)
   font-size: 30px;
 }
 
-.dashboard-heading > span {
-  color: var(--color-text-muted);
-  font-size: 11px;
+.dashboard-heading > a {
+  color: var(--color-cinnabar);
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .metrics {
@@ -189,54 +156,21 @@ onMounted(loadDashboard)
   font-weight: 800;
 }
 
-.table {
-  margin-top: 18px;
-}
-
-.table-row {
-  display: grid;
-  grid-template-columns: 1.5fr 0.7fr 1fr 0.6fr;
-  gap: 12px;
-  align-items: center;
-  min-height: 54px;
-  border-top: 1px solid #edf2ef;
-  font-size: 12px;
-}
-
-.table-head {
-  min-height: 38px;
-  border-top: 0;
-  color: var(--color-text-muted);
-  font-size: 10px;
-  font-weight: 800;
-}
-
-.level {
-  width: fit-content;
-  padding: 5px 8px;
-  border-radius: 5px;
-  background: var(--color-jade-light);
-  color: var(--color-ink);
-  font-weight: 800;
-}
-
-.level-attention,
-.level-urgent {
-  background: var(--color-cinnabar-soft);
-  color: #9f3f2e;
-}
+.dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.distribution { display: grid; gap: 15px; margin-top: 24px; }
+.distribution div { display: grid; grid-template-columns: 1fr auto; gap: 7px; color: var(--color-text-muted); font-size: 12px; }
+.distribution strong { color: var(--color-ink); }
+.distribution i { display: block; height: 7px; grid-column: 1 / -1; border-radius: 99px; background: var(--color-jade); }
+.distribution.urgency i { background: var(--color-cinnabar); }
+.trend-chart { display: flex; min-height: 210px; align-items: end; gap: 18px; margin-top: 18px; }
+.trend-chart div { display: grid; flex: 1; justify-items: center; gap: 7px; color: var(--color-text-muted); font-size: 10px; }
+.trend-chart i { width: min(44px, 80%); border-radius: 5px 5px 0 0; background: linear-gradient(var(--color-jade), var(--color-ink)); }
+.trend-chart strong { font-size: 11px; }
 
 @media (max-width: 900px) {
   .metrics {
     grid-template-columns: repeat(2, 1fr);
   }
-
-  .table {
-    overflow-x: auto;
-  }
-
-  .table-row {
-    min-width: 700px;
-  }
+  .dashboard-grid { grid-template-columns: 1fr; }
 }
 </style>

@@ -12,6 +12,7 @@ const navigation = [
   { label: '我的问诊', to: '/consultation/my' },
   { label: '养生知识', to: '/knowledge' },
   { label: '药膳推荐', to: '/recipes' },
+  { label: 'AI 养生问答', to: '/ai/ask' },
 ]
 
 async function logout() {
