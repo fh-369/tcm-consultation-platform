@@ -15,6 +15,8 @@ public class PatientAccount {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    private Long accountId;
+
     private String username;
 
     private String passwordHash;

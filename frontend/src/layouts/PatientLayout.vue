@@ -17,7 +17,7 @@ const navigation = [
 
 async function logout() {
   auth.logout()
-  await router.push('/')
+  await router.replace('/login')
 }
 </script>
 
@@ -25,11 +25,11 @@ async function logout() {
   <div class="patient-shell">
     <header class="patient-header">
       <div class="page-container header-inner">
-        <RouterLink class="brand" to="/" aria-label="返回岐黄问诊首页">
-          <span class="brand-mark" aria-hidden="true">岐</span>
+        <RouterLink class="brand" to="/" aria-label="返回知身问养首页">
+          <img class="brand-mark" src="../assets/brand/logo-mark.png" alt="" />
           <span>
-            <strong>岐黄问诊</strong>
-            <small>中医问诊与养生平台</small>
+            <strong>知身问养</strong>
+            <small>中医问诊与日常养护平台</small>
           </span>
         </RouterLink>
 
@@ -41,7 +41,7 @@ async function logout() {
             <span>{{ auth.displayName || '患者用户' }}</span>
             <button type="button" @click="logout">退出</button>
           </div>
-          <RouterLink v-else class="login-link" to="/login/patient">登录</RouterLink>
+          <RouterLink v-else class="login-link" to="/login">登录</RouterLink>
         </nav>
       </div>
     </header>
@@ -52,7 +52,7 @@ async function logout() {
 
     <footer class="patient-footer">
       <div class="page-container footer-inner">
-        <strong>岐黄问诊</strong>
+        <strong>知身问养</strong>
         <span>清楚记录身体变化，安心了解问诊进度。</span>
       </div>
     </footer>
@@ -92,15 +92,9 @@ async function logout() {
 }
 
 .brand-mark {
-  display: grid;
   width: 38px;
   height: 38px;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--color-ink);
-  color: white;
-  font-size: 18px;
-  font-weight: 800;
+  object-fit: contain;
 }
 
 .brand strong,

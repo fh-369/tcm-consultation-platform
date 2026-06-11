@@ -10,6 +10,7 @@ import com.tcm.platform.entity.KnowledgeArticle;
 import com.tcm.platform.entity.PatientAccount;
 import com.tcm.platform.entity.Recipe;
 import com.tcm.platform.entity.User;
+import com.tcm.platform.mapper.AccountMapper;
 import com.tcm.platform.mapper.PatientAccountMapper;
 import com.tcm.platform.mapper.ConsultationMapper;
 import com.tcm.platform.mapper.KnowledgeArticleMapper;
@@ -90,6 +91,9 @@ class ApiSystemTest {
     private AIService aiService;
 
     @MockBean
+    private AccountMapper accountMapper;
+
+    @MockBean
     private PatientAccountMapper patientAccountMapper;
 
     @MockBean
@@ -133,7 +137,17 @@ class ApiSystemTest {
         LoginResponse response = new LoginResponse();
         response.setToken("patient-token");
         response.setRole("patient");
+        when(authService.login(any())).thenReturn(response);
         when(authService.loginPatient(any())).thenReturn(response);
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"username":"patient1","password":"patient123"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.token").value("patient-token"))
+                .andExpect(jsonPath("$.data.role").value("patient"));
 
         mockMvc.perform(post("/api/auth/login/patient")
                         .contentType(MediaType.APPLICATION_JSON)

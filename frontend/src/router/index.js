@@ -84,23 +84,27 @@ const router = createRouter({
       component: () => import('../layouts/AuthLayout.vue'),
       children: [
         {
+          path: 'login',
+          name: 'login',
+          component: () => import('../views/auth/AuthView.vue'),
+          meta: { guestOnly: true },
+        },
+        {
           path: 'login/patient',
           name: 'patient-login',
-          component: () => import('../views/auth/LoginView.vue'),
-          props: { mode: 'patient' },
+          component: () => import('../views/auth/AuthView.vue'),
           meta: { guestOnly: true },
         },
         {
           path: 'login/admin',
           name: 'admin-login',
-          component: () => import('../views/auth/LoginView.vue'),
-          props: { mode: 'admin' },
+          component: () => import('../views/auth/AuthView.vue'),
           meta: { guestOnly: true },
         },
         {
           path: 'register',
           name: 'register',
-          component: () => import('../views/auth/RegisterView.vue'),
+          component: () => import('../views/auth/AuthView.vue'),
           meta: { guestOnly: true },
         },
       ],
@@ -159,8 +163,7 @@ router.beforeEach((to) => {
   }
 
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
-    const loginPath = to.meta.roles?.includes('patient') ? '/login/patient' : '/login/admin'
-    return { path: loginPath, query: { redirect: to.fullPath } }
+    return { path: '/login', query: { redirect: to.fullPath } }
   }
 
   if (to.meta.roles && !canAccessRole(auth.role, to.meta.roles)) {

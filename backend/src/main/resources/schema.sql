@@ -9,9 +9,21 @@ CREATE DATABASE IF NOT EXISTS tcm_platform
 
 USE tcm_platform;
 
+-- 全局登录账号表
+CREATE TABLE accounts (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
+    username VARCHAR(50) NOT NULL UNIQUE COMMENT '全局唯一用户名',
+    password_hash VARCHAR(255) NOT NULL COMMENT '密码哈希(BCrypt)',
+    role ENUM('patient', 'doctor', 'admin') NOT NULL COMMENT '账号角色',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    INDEX idx_account_role (role)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='全局登录账号表';
+
 -- 用户表 (医生/管理员)
 CREATE TABLE users (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
+    account_id BIGINT NOT NULL UNIQUE COMMENT '全局账号ID',
     username VARCHAR(50) NOT NULL UNIQUE COMMENT '用户名',
     password_hash VARCHAR(255) NOT NULL COMMENT '密码哈希(BCrypt)',
     role ENUM('admin', 'doctor') NOT NULL DEFAULT 'doctor' COMMENT '角色',
@@ -20,12 +32,14 @@ CREATE TABLE users (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     INDEX idx_username (username),
-    INDEX idx_role (role)
+    INDEX idx_role (role),
+    FOREIGN KEY (account_id) REFERENCES accounts(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
 
 -- 患者账号表
 CREATE TABLE patient_accounts (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
+    account_id BIGINT NOT NULL UNIQUE COMMENT '全局账号ID',
     username VARCHAR(50) NOT NULL UNIQUE COMMENT '用户名',
     password_hash VARCHAR(255) NOT NULL COMMENT '密码哈希(BCrypt)',
     display_name VARCHAR(100) COMMENT '昵称',
@@ -34,7 +48,8 @@ CREATE TABLE patient_accounts (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     INDEX idx_username (username),
-    INDEX idx_phone (phone)
+    INDEX idx_phone (phone),
+    FOREIGN KEY (account_id) REFERENCES accounts(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='患者账号表';
 
 -- 问诊单表（核心业务表）
@@ -118,10 +133,13 @@ CREATE TABLE uploads (
     INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='上传记录表';
 
--- 初始化默认管理员账号 (密码: admin123, BCrypt加密)
-INSERT INTO users (username, password_hash, role, display_name) VALUES
-('admin', '$2a$10$dOmQRUxZF5udxjV651CP0ez4T0.iQNvC6BVZMZOCpY2WhZCscfWfO', 'admin', '系统管理员');
+-- 初始化默认管理员和医生账号
+INSERT INTO accounts (username, password_hash, role) VALUES
+('admin', '$2a$10$dOmQRUxZF5udxjV651CP0ez4T0.iQNvC6BVZMZOCpY2WhZCscfWfO', 'admin'),
+('doctor1', '$2a$10$oBczDgrrscIsIBdZTBfQlOLNNnUTDf1665Hawnxn.BAtVgZOaizxG', 'doctor');
 
--- 初始化默认医生账号 (密码: doctor123, BCrypt加密)
-INSERT INTO users (username, password_hash, role, display_name, department) VALUES
-('doctor1', '$2a$10$oBczDgrrscIsIBdZTBfQlOLNNnUTDf1665Hawnxn.BAtVgZOaizxG', 'doctor', '张医生', '内科');
+INSERT INTO users (account_id, username, password_hash, role, display_name) VALUES
+((SELECT id FROM accounts WHERE username = 'admin'), 'admin', '$2a$10$dOmQRUxZF5udxjV651CP0ez4T0.iQNvC6BVZMZOCpY2WhZCscfWfO', 'admin', '系统管理员');
+
+INSERT INTO users (account_id, username, password_hash, role, display_name, department) VALUES
+((SELECT id FROM accounts WHERE username = 'doctor1'), 'doctor1', '$2a$10$oBczDgrrscIsIBdZTBfQlOLNNnUTDf1665Hawnxn.BAtVgZOaizxG', 'doctor', '张医生', '内科');

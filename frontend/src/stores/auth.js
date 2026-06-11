@@ -20,8 +20,8 @@ export const useAuthStore = defineStore('auth', {
       saveSession(getBrowserStorage(), this.$state)
     },
     logout() {
-      this.$reset()
       clearSession(getBrowserStorage())
+      this.$reset()
     },
   },
 })

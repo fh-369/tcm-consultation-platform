@@ -1,31 +1,29 @@
 package com.tcm.platform.entity;
 
-import com.baomidou.mybatisplus.annotation.*;
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
+
 import java.time.LocalDateTime;
 
 /**
- * 用户实体（医生/管理员）
- * 任务：完善字段定义，对应数据库 users 表
+ * 全局登录账号，负责用户名唯一性与身份认证。
  */
 @Data
-@TableName("users")
-public class User {
-    
+@TableName("accounts")
+public class Account {
+
     @TableId(type = IdType.AUTO)
     private Long id;
-
-    private Long accountId;
 
     private String username;
 
     private String passwordHash;
 
     private String role;
-
-    private String displayName;
-
-    private String department;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
