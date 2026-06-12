@@ -184,7 +184,15 @@ class ApiSystemTest {
         mockMvc.perform(post("/api/patient/consultation")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"patientName":"李女士","symptoms":"容易疲倦","urgency":"普通"}
+                                {
+                                  "patientName":"李女士",
+                                  "age":35,
+                                  "gender":"女",
+                                  "phone":"13800000000",
+                                  "symptoms":"容易疲倦",
+                                  "duration":"约两周",
+                                  "urgency":"普通"
+                                }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.patientAccountId").value(8));
@@ -201,6 +209,39 @@ class ApiSystemTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.fallback").value(true))
                 .andExpect(jsonPath("$.data.disclaimer").value("不能替代医生诊断。"));
+    }
+
+    @Test
+    @WithMockUser(username = "patient1", roles = "PATIENT")
+    void consultationSubmissionReturnsClearValidationMessages() throws Exception {
+        PatientAccount patient = new PatientAccount();
+        patient.setId(8L);
+        patient.setUsername("patient1");
+        when(patientAccountMapper.selectOne(any())).thenReturn(patient);
+
+        mockMvc.perform(post("/api/patient/consultation")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "patientName":"123",
+                                  "age":0,
+                                  "gender":"",
+                                  "phone":"1234",
+                                  "symptoms":"",
+                                  "duration":"",
+                                  "urgency":"普通"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.containsString("患者姓名应为"),
+                        org.hamcrest.Matchers.containsString("患者年龄必须在"),
+                        org.hamcrest.Matchers.containsString("请选择性别"),
+                        org.hamcrest.Matchers.containsString("请输入正确的 11 位手机号"),
+                        org.hamcrest.Matchers.containsString("请描述主要症状"),
+                        org.hamcrest.Matchers.containsString("请输入症状持续时间")
+                )));
     }
 
     @Test

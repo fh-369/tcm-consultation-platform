@@ -39,15 +39,15 @@ public class ConsultationService {
 
         Consultation consultation = new Consultation();
         consultation.setPatientAccountId(request.getPatientAccountId());
-        consultation.setPatientName(request.getPatientName());
+        consultation.setPatientName(request.getPatientName().trim());
         consultation.setAge(request.getAge());
         consultation.setGender(request.getGender());
-        consultation.setPhone(request.getPhone());
-        consultation.setSymptoms(request.getSymptoms());
-        consultation.setDuration(request.getDuration());
-        consultation.setAllergyHistory(request.getAllergyHistory());
+        consultation.setPhone(request.getPhone().trim());
+        consultation.setSymptoms(request.getSymptoms().trim());
+        consultation.setDuration(request.getDuration().trim());
+        consultation.setAllergyHistory(nullIfBlank(request.getAllergyHistory()));
         consultation.setUrgency(urgency);
-        consultation.setPatientNote(request.getPatientNote());
+        consultation.setPatientNote(nullIfBlank(request.getPatientNote()));
         consultation.setStatus(INITIAL_STATUS);
         reminderService.applyReminder(consultation);
 
@@ -163,5 +163,9 @@ public class ConsultationService {
 
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private String nullIfBlank(String value) {
+        return hasText(value) ? value.trim() : null;
     }
 }

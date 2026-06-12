@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import { nextTick, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { CircleCheck } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
@@ -7,6 +7,7 @@ import { useRouter } from 'vue-router'
 import { createConsultation } from '../../api/consultation'
 
 const router = useRouter()
+const formRef = ref()
 const submitting = ref(false)
 const form = reactive({
   patientName: '',
@@ -20,23 +21,81 @@ const form = reactive({
   patientNote: '',
 })
 
+const namePattern = /^[\u4e00-\u9fa5A-Za-z·\s]{2,50}$/
+const phonePattern = /^1[3-9]\d{9}$/
+const rules = {
+  patientName: [
+    { required: true, message: '请输入患者姓名', trigger: 'blur' },
+    {
+      pattern: namePattern,
+      message: '姓名应为 2-50 个中文、英文字母、空格或间隔号',
+      trigger: 'blur',
+    },
+  ],
+  age: [
+    { required: true, message: '请输入患者年龄', trigger: 'change' },
+    {
+      validator: (_, value, callback) => {
+        if (value >= 1 && value <= 150) {
+          callback()
+          return
+        }
+        callback(new Error('患者年龄必须在 1-150 岁之间'))
+      },
+      trigger: 'change',
+    },
+  ],
+  gender: [{ required: true, message: '请选择性别', trigger: 'change' }],
+  phone: [
+    { required: true, message: '请输入手机号', trigger: 'blur' },
+    { pattern: phonePattern, message: '请输入正确的 11 位手机号', trigger: 'blur' },
+  ],
+  symptoms: [
+    { required: true, message: '请描述主要症状', trigger: 'blur' },
+    { min: 2, max: 2000, message: '主要症状应为 2-2000 个字符', trigger: 'blur' },
+  ],
+  duration: [
+    { required: true, message: '请输入症状持续时间', trigger: 'blur' },
+    { max: 100, message: '症状持续时间不能超过 100 个字符', trigger: 'blur' },
+  ],
+  urgency: [{ required: true, message: '请选择紧急程度', trigger: 'change' }],
+}
+
 function errorMessage(error) {
   return error.response?.data?.message || error.message || '问诊提交失败，请稍后重试'
 }
 
-async function submit() {
-  if (!form.patientName.trim()) {
-    ElMessage.warning('请填写患者姓名')
+async function scrollToFirstError() {
+  await nextTick()
+  const firstError = document.querySelector('.consultation-form .el-form-item.is-error')
+  if (!firstError) {
     return
   }
-  if (!form.symptoms.trim()) {
-    ElMessage.warning('请描述主要症状')
+
+  const headerHeight = document.querySelector('.patient-header')?.offsetHeight || 82
+  const top = window.scrollY + firstError.getBoundingClientRect().top - headerHeight - 20
+  window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
+}
+
+async function submit() {
+  try {
+    await formRef.value.validate()
+  } catch {
+    await scrollToFirstError()
     return
   }
 
   submitting.value = true
   try {
-    await createConsultation(form)
+    await createConsultation({
+      ...form,
+      patientName: form.patientName.trim(),
+      phone: form.phone.trim(),
+      symptoms: form.symptoms.trim(),
+      duration: form.duration.trim(),
+      allergyHistory: form.allergyHistory.trim() || null,
+      patientNote: form.patientNote.trim() || null,
+    })
     ElMessage.success('问诊单已提交')
     await router.push('/consultation/my')
   } catch (error) {
@@ -49,7 +108,14 @@ async function submit() {
 
 <template>
   <section class="consultation-page page-container">
-    <el-form class="consultation-form" label-position="top" @submit.prevent="submit">
+    <el-form
+      ref="formRef"
+      class="consultation-form"
+      label-position="top"
+      :model="form"
+      :rules="rules"
+      @submit.prevent="submit"
+    >
       <div class="form-title">
         <el-icon><CircleCheck /></el-icon>
         新建问诊单
@@ -65,20 +131,20 @@ async function submit() {
         </div>
 
         <div class="field-grid">
-          <el-form-item label="患者姓名（必填）">
-            <el-input v-model="form.patientName" maxlength="100" placeholder="请输入患者姓名" />
+          <el-form-item label="患者姓名（必填）" prop="patientName">
+            <el-input v-model="form.patientName" maxlength="50" placeholder="请输入患者姓名" />
           </el-form-item>
-          <el-form-item label="年龄">
-            <el-input-number v-model="form.age" :min="0" :max="150" controls-position="right" />
+          <el-form-item label="年龄（必填）" prop="age">
+            <el-input-number v-model="form.age" :min="1" :max="150" controls-position="right" />
           </el-form-item>
-          <el-form-item label="性别">
+          <el-form-item label="性别（必填）" prop="gender">
             <el-radio-group v-model="form.gender" class="gender-options">
               <el-radio-button label="男" value="男" />
               <el-radio-button label="女" value="女" />
             </el-radio-group>
           </el-form-item>
-          <el-form-item label="手机号">
-            <el-input v-model="form.phone" maxlength="20" placeholder="选填" />
+          <el-form-item label="手机号（必填）" prop="phone">
+            <el-input v-model="form.phone" maxlength="11" placeholder="请输入 11 位手机号" />
           </el-form-item>
         </div>
       </section>
@@ -92,7 +158,7 @@ async function submit() {
           </div>
         </div>
 
-        <el-form-item class="symptom-field" label="主要症状（必填）">
+        <el-form-item class="symptom-field" label="主要症状（必填）" prop="symptoms">
           <el-input
             v-model="form.symptoms"
             :rows="5"
@@ -103,10 +169,10 @@ async function submit() {
           />
         </el-form-item>
         <div class="field-grid">
-          <el-form-item label="持续时间">
+          <el-form-item label="持续时间（必填）" prop="duration">
             <el-input v-model="form.duration" maxlength="100" placeholder="例如：约三天" />
           </el-form-item>
-          <el-form-item label="紧急程度">
+          <el-form-item label="紧急程度（必填）" prop="urgency">
             <el-radio-group v-model="form.urgency">
               <el-radio-button label="普通" value="普通" />
               <el-radio-button label="紧急" value="紧急" />
@@ -255,6 +321,20 @@ async function submit() {
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 86%),
     0 7px 20px rgb(33 93 67 / 4%);
+}
+
+.form-section :deep(.el-form-item.is-error) {
+  border-color: rgb(201 81 61 / 34%);
+  background: linear-gradient(145deg, #fff9f7, #fff2ee);
+}
+
+.form-section :deep(.el-form-item__error) {
+  position: static;
+  margin-top: 8px;
+  color: var(--color-cinnabar);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
 }
 
 .form-section > :deep(.el-form-item) {

@@ -1,6 +1,7 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Plus } from '@element-plus/icons-vue'
 
 import { getMyConsultations } from '../../api/consultation'
 import {
@@ -52,16 +53,8 @@ onMounted(loadConsultations)
 
 <template>
   <section class="records-page page-container">
-    <header class="records-heading">
-      <div>
-        <p>持续跟进身体变化</p>
-        <h1>我的问诊</h1>
-        <span>查看问诊状态、提醒信息与医生备注。</span>
-      </div>
-      <RouterLink class="primary-link" to="/consultation/new">建立新问诊单</RouterLink>
-    </header>
-
     <section class="filters" aria-label="问诊记录筛选">
+      <h1>我的问诊</h1>
       <el-select v-model="filters.status" clearable placeholder="全部状态" @change="applyFilters">
         <el-option label="待接诊" value="待接诊" />
         <el-option label="接诊中" value="接诊中" />
@@ -73,6 +66,10 @@ onMounted(loadConsultations)
         <el-option label="非常紧急" value="非常紧急" />
       </el-select>
       <span>共 {{ total }} 条问诊记录</span>
+      <RouterLink class="new-consultation-link" to="/consultation/new">
+        <el-icon><Plus /></el-icon>
+        新建问诊单
+      </RouterLink>
     </section>
 
     <div v-loading="loading" class="records">
@@ -139,10 +136,10 @@ onMounted(loadConsultations)
 
 <style scoped>
 .records-page {
-  padding-top: 42px;
+  padding-top: 24px;
+  padding-bottom: 40px;
 }
 
-.records-heading,
 .filters,
 .record-card header {
   display: flex;
@@ -151,22 +148,15 @@ onMounted(loadConsultations)
   gap: 18px;
 }
 
-.records-heading p {
-  margin: 0;
-  color: var(--color-cinnabar);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.16em;
-}
-
-.records-heading h1 {
-  margin: 10px 0;
+.filters h1 {
+  flex: 0 0 auto;
+  margin: 0 12px 0 0;
   color: var(--color-ink);
-  font-size: clamp(2.2rem, 5vw, 3.8rem);
-  letter-spacing: -0.06em;
+  font-family: "Noto Serif SC", "STSong", serif;
+  font-size: 24px;
+  letter-spacing: 0.035em;
 }
 
-.records-heading span,
 .filters > span,
 .record-card time {
   color: var(--color-text-muted);
@@ -175,19 +165,57 @@ onMounted(loadConsultations)
 
 .filters {
   justify-content: start;
-  margin-top: 30px;
-  padding: 16px;
+  min-height: 72px;
+  padding: 12px 14px 12px 20px;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: rgb(255 255 255 / 75%);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 100% 0%, rgb(255 255 255 / 88%), transparent 32%),
+    rgb(247 251 248 / 82%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 86%),
+    0 12px 32px rgb(23 60 45 / 6%);
+  backdrop-filter: blur(16px);
 }
 
 .filters .el-select {
-  width: 180px;
+  width: 170px;
+}
+
+.filters :deep(.el-select__wrapper) {
+  min-height: 42px;
+  border: 1px solid rgb(67 126 97 / 13%);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 72%);
+  box-shadow: inset 0 1px 2px rgb(30 80 57 / 3%);
 }
 
 .filters > span {
   margin-left: auto;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.new-consultation-link {
+  display: inline-flex;
+  min-height: 44px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 7px;
+  padding: 0 17px;
+  border: 1px solid rgb(255 255 255 / 40%);
+  border-radius: 999px;
+  background: var(--color-ink);
+  box-shadow: 0 10px 24px rgb(17 66 47 / 18%);
+  color: white;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.new-consultation-link:hover {
+  background: #236e50;
+  box-shadow: 0 13px 28px rgb(17 66 47 / 23%);
+  transform: translateY(-1px);
 }
 
 .records {
@@ -302,10 +330,13 @@ dd {
 }
 
 @media (max-width: 620px) {
-  .records-heading,
   .filters {
     display: grid;
     justify-content: stretch;
+  }
+
+  .filters h1 {
+    margin-right: 0;
   }
 
   .filters .el-select {
@@ -314,6 +345,10 @@ dd {
 
   .filters > span {
     margin-left: 0;
+  }
+
+  .new-consultation-link {
+    justify-content: center;
   }
 
   dl {

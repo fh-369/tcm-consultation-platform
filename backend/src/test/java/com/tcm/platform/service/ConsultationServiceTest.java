@@ -145,7 +145,11 @@ class ConsultationServiceTest {
         ConsultationRequest request = new ConsultationRequest();
         request.setPatientAccountId(8L);
         request.setPatientName("李女士");
+        request.setAge(35);
+        request.setGender("女");
+        request.setPhone("13800000000");
         request.setSymptoms("容易疲倦");
+        request.setDuration("约两周");
         request.setUrgency(urgency);
         return request;
     }
