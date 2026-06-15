@@ -37,14 +37,35 @@ class KnowledgeArticleServiceTest {
     @Test
     void listPublishedArticlesOnlyQueriesPublishedContent() {
         KnowledgeArticleService service = new KnowledgeArticleService(knowledgeArticleMapper);
-        when(knowledgeArticleMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(java.util.List.of());
+        when(knowledgeArticleMapper.selectPage(any(IPage.class), any(LambdaQueryWrapper.class)))
+                .thenReturn(new Page<>());
 
-        service.listPublishedArticles();
+        service.listPublishedArticles(1, 6, null);
 
         ArgumentCaptor<LambdaQueryWrapper<KnowledgeArticle>> queryCaptor =
                 ArgumentCaptor.forClass(LambdaQueryWrapper.class);
-        verify(knowledgeArticleMapper).selectList(queryCaptor.capture());
+        verify(knowledgeArticleMapper).selectPage(any(IPage.class), queryCaptor.capture());
         assertThat(queryCaptor.getValue().getCustomSqlSegment()).contains("published");
+    }
+
+    @Test
+    void openingPublishedArticleIncrementsAndReturnsLatestViewCount() {
+        KnowledgeArticleService service = new KnowledgeArticleService(knowledgeArticleMapper);
+        KnowledgeArticle before = article("睡眠节律", "正文");
+        before.setId(8L);
+        before.setPublished(true);
+        before.setViewCount(3);
+        KnowledgeArticle after = article("睡眠节律", "正文");
+        after.setId(8L);
+        after.setPublished(true);
+        after.setViewCount(4);
+        when(knowledgeArticleMapper.selectById(8L)).thenReturn(before, after);
+        when(knowledgeArticleMapper.incrementPublishedViewCount(8L)).thenReturn(1);
+
+        KnowledgeArticle result = service.getPublishedArticle(8L);
+
+        assertThat(result.getViewCount()).isEqualTo(4);
+        verify(knowledgeArticleMapper).incrementPublishedViewCount(8L);
     }
 
     @Test
@@ -57,6 +78,18 @@ class KnowledgeArticleServiceTest {
 
         assertThat(created.getPublished()).isFalse();
         assertThat(created.getViewCount()).isZero();
+        assertThat(created.getCategory()).isEqualTo("四季养护");
+    }
+
+    @Test
+    void createArticleAutomaticallyClassifiesMissingCategory() {
+        KnowledgeArticleService service = new KnowledgeArticleService(knowledgeArticleMapper);
+        when(knowledgeArticleMapper.insert(any(KnowledgeArticle.class))).thenReturn(1);
+        KnowledgeArticle article = article("稳定睡眠节律", "每天尽量按时入睡和起床");
+
+        KnowledgeArticle created = service.createArticle(article);
+
+        assertThat(created.getCategory()).isEqualTo("睡眠起居");
     }
 
     @Test

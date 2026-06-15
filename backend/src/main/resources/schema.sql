@@ -89,7 +89,7 @@ CREATE TABLE knowledge_articles (
     category VARCHAR(50) COMMENT '分类',
     summary VARCHAR(500) COMMENT '摘要',
     content TEXT NOT NULL COMMENT '正文内容',
-    tips JSON COMMENT '小贴士',
+    tips TEXT COMMENT '小贴士',
     cover_image_url VARCHAR(500) COMMENT '封面图片URL',
     published TINYINT(1) DEFAULT 0 COMMENT '是否发布(0=草稿,1=发布)',
     view_count INT DEFAULT 0 COMMENT '浏览量',

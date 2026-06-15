@@ -16,12 +16,17 @@ describe('content and AI API', () => {
 
   it('loads public knowledge and recipes', async () => {
     request.get.mockResolvedValue({ data: { code: 200, data: [] } })
-    const { getPublishedKnowledge, getPublishedRecipes } = await import('./content')
+    const { getPublishedKnowledge, getPublishedKnowledgeCategories, getPublishedRecipes } =
+      await import('./content')
 
-    await getPublishedKnowledge()
+    await getPublishedKnowledge({ current: 1, size: 6 })
+    await getPublishedKnowledgeCategories()
     await getPublishedRecipes()
 
-    expect(request.get).toHaveBeenCalledWith('/patient/knowledge')
+    expect(request.get).toHaveBeenCalledWith('/patient/knowledge', {
+      params: { current: 1, size: 6 },
+    })
+    expect(request.get).toHaveBeenCalledWith('/patient/knowledge/categories')
     expect(request.get).toHaveBeenCalledWith('/patient/recipe')
   })
 

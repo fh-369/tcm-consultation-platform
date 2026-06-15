@@ -119,13 +119,21 @@ class ApiSystemTest {
         Recipe recipe = new Recipe();
         recipe.setId(2L);
         recipe.setName("山药粥");
-        when(knowledgeArticleService.listPublishedArticles()).thenReturn(List.of(article));
+        Page<KnowledgeArticle> knowledgePage = new Page<>(1, 6);
+        knowledgePage.setRecords(List.of(article));
+        knowledgePage.setTotal(1);
+        when(knowledgeArticleService.listPublishedArticles(1, 6, null)).thenReturn(knowledgePage);
+        when(knowledgeArticleService.listPublishedCategories()).thenReturn(List.of("四季养护"));
         when(recipeService.listPublishedRecipes()).thenReturn(List.of(recipe));
 
         mockMvc.perform(get("/api/patient/knowledge"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data[0].title").value("春季养生"));
+                .andExpect(jsonPath("$.data.records[0].title").value("春季养生"));
+
+        mockMvc.perform(get("/api/patient/knowledge/categories"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0]").value("四季养护"));
 
         mockMvc.perform(get("/api/patient/recipe"))
                 .andExpect(status().isOk())

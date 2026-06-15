@@ -10,8 +10,12 @@ function unwrapResult(response) {
   return result.data
 }
 
-export async function getPublishedKnowledge() {
-  return unwrapResult(await request.get('/patient/knowledge'))
+export async function getPublishedKnowledge(params) {
+  return unwrapResult(await request.get('/patient/knowledge', { params }))
+}
+
+export async function getPublishedKnowledgeCategories() {
+  return unwrapResult(await request.get('/patient/knowledge/categories'))
 }
 
 export async function getPublishedKnowledgeDetail(id) {
