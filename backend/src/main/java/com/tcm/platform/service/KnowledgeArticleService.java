@@ -22,13 +22,19 @@ public class KnowledgeArticleService {
         this.knowledgeArticleMapper = knowledgeArticleMapper;
     }
 
-    public Page<KnowledgeArticle> listPublishedArticles(long current, long size, String category) {
+    public Page<KnowledgeArticle> listPublishedArticles(long current, long size, String category, String keyword) {
         validatePage(current, size);
         return knowledgeArticleMapper.selectPage(
                 new Page<>(current, size),
                 new LambdaQueryWrapper<KnowledgeArticle>()
                         .eq(KnowledgeArticle::getPublished, true)
                         .eq(hasText(category), KnowledgeArticle::getCategory, category)
+                        .and(hasText(keyword), wrapper -> wrapper
+                                .like(KnowledgeArticle::getTitle, keyword)
+                                .or()
+                                .like(KnowledgeArticle::getSummary, keyword)
+                                .or()
+                                .like(KnowledgeArticle::getContent, keyword))
                         .orderByDesc(KnowledgeArticle::getCreatedAt)
         );
     }

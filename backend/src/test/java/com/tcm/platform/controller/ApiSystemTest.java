@@ -122,7 +122,7 @@ class ApiSystemTest {
         Page<KnowledgeArticle> knowledgePage = new Page<>(1, 6);
         knowledgePage.setRecords(List.of(article));
         knowledgePage.setTotal(1);
-        when(knowledgeArticleService.listPublishedArticles(1, 6, null)).thenReturn(knowledgePage);
+        when(knowledgeArticleService.listPublishedArticles(1, 6, null, null)).thenReturn(knowledgePage);
         when(knowledgeArticleService.listPublishedCategories()).thenReturn(List.of("四季养护"));
         when(recipeService.listPublishedRecipes()).thenReturn(List.of(recipe));
 

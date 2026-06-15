@@ -40,12 +40,27 @@ class KnowledgeArticleServiceTest {
         when(knowledgeArticleMapper.selectPage(any(IPage.class), any(LambdaQueryWrapper.class)))
                 .thenReturn(new Page<>());
 
-        service.listPublishedArticles(1, 6, null);
+        service.listPublishedArticles(1, 6, null, null);
 
         ArgumentCaptor<LambdaQueryWrapper<KnowledgeArticle>> queryCaptor =
                 ArgumentCaptor.forClass(LambdaQueryWrapper.class);
         verify(knowledgeArticleMapper).selectPage(any(IPage.class), queryCaptor.capture());
         assertThat(queryCaptor.getValue().getCustomSqlSegment()).contains("published");
+    }
+
+    @Test
+    void listPublishedArticlesCombinesCategoryAndKeywordSearch() {
+        KnowledgeArticleService service = new KnowledgeArticleService(knowledgeArticleMapper);
+        when(knowledgeArticleMapper.selectPage(any(IPage.class), any(LambdaQueryWrapper.class)))
+                .thenReturn(new Page<>());
+
+        service.listPublishedArticles(1, 6, "睡眠起居", "节律");
+
+        ArgumentCaptor<LambdaQueryWrapper<KnowledgeArticle>> queryCaptor =
+                ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        verify(knowledgeArticleMapper).selectPage(any(IPage.class), queryCaptor.capture());
+        assertThat(queryCaptor.getValue().getCustomSqlSegment())
+                .contains("published", "category", "title", "summary", "content", "OR");
     }
 
     @Test

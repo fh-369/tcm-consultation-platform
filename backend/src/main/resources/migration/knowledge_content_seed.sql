@@ -3,6 +3,15 @@ USE tcm_platform;
 ALTER TABLE knowledge_articles MODIFY COLUMN tips TEXT COMMENT '小贴士';
 
 DELETE FROM knowledge_articles WHERE id IN (3, 4, 5);
+DELETE FROM knowledge_articles WHERE title IN (
+    '一餐如何吃得更均衡',
+    '少盐不寡淡：让味道回到食材本身',
+    '久坐之后，给身体一个短暂的活动间隙',
+    '稳定睡眠节律，从固定起床时间开始',
+    '高温天气，补水与降温要主动一些',
+    '春日户外活动，从轻松步行开始',
+    '情绪紧绷时，先给自己一个停顿'
+);
 
 INSERT INTO knowledge_articles
     (title, category, summary, content, tips, cover_image_url, published, view_count)
@@ -167,4 +176,25 @@ https://www.who.int/publications/i/item/9789240003927',
     '/knowledge/calm-mind.png',
     1,
     0
+);
+
+UPDATE knowledge_articles
+SET content = REPLACE(
+        REPLACE(
+            REPLACE(
+                REPLACE(content, '\n\n一、', '\n\n## 一、'),
+                '\n\n二、', '\n\n## 二、'
+            ),
+            '\n\n三、', '\n\n## 三、'
+        ),
+        '\n\n资料来源：', '\n\n---\n\n> **资料来源**'
+    )
+WHERE title IN (
+    '一餐如何吃得更均衡',
+    '少盐不寡淡：让味道回到食材本身',
+    '久坐之后，给身体一个短暂的活动间隙',
+    '稳定睡眠节律，从固定起床时间开始',
+    '高温天气，补水与降温要主动一些',
+    '春日户外活动，从轻松步行开始',
+    '情绪紧绷时，先给自己一个停顿'
 );

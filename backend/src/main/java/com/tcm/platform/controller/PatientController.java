@@ -76,9 +76,10 @@ public class PatientController {
     public Result<Page<KnowledgeArticle>> listPublishedKnowledge(
             @RequestParam(defaultValue = "1") long current,
             @RequestParam(defaultValue = "6") long size,
-            @RequestParam(required = false) String category
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String keyword
     ) {
-        return Result.success(knowledgeArticleService.listPublishedArticles(current, size, category));
+        return Result.success(knowledgeArticleService.listPublishedArticles(current, size, category, keyword));
     }
 
     @GetMapping("/knowledge/categories")
