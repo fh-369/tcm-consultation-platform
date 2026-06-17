@@ -25,6 +25,6 @@ public class AIController {
 
     @PostMapping("/question")
     public Result<AIAnswerResponse> answer(@Valid @RequestBody AIQuestionRequest request) {
-        return Result.success(aiService.answer(request.getQuestion()));
+        return Result.success(aiService.answer(request.getQuestion(), request.getContext()));
     }
 }

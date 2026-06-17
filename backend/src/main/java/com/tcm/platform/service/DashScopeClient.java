@@ -1,11 +1,14 @@
 package com.tcm.platform.service;
 
+import com.tcm.platform.dto.AIQuestionRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
+
+import java.util.List;
 
 /**
  * 阿里云 DashScope 文本生成 API 客户端。
@@ -17,7 +20,9 @@ public class DashScopeClient {
             你是一名中医养生助手。请仅提供一般性的生活调养建议，不要进行诊断、开具处方或替代医生。
             回答应简洁、谨慎，并提醒用户：症状严重、持续或出现危险信号时应及时就医。
 
-            用户问题：%s
+            %s
+
+            用户当前问题：%s
             """;
 
     private final RestTemplate restTemplate;
@@ -34,14 +39,14 @@ public class DashScopeClient {
         this.model = model;
     }
 
-    public String ask(String apiKey, String question) {
+    public String ask(String apiKey, String question, List<AIQuestionRequest.ContextMessage> context) {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(apiKey);
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         DashScopeRequest request = new DashScopeRequest(
                 model,
-                new Input(PROMPT_TEMPLATE.formatted(question)),
+                new Input(PROMPT_TEMPLATE.formatted(formatContext(context), question)),
                 new Parameters("text")
         );
         DashScopeResponse response = restTemplate.postForObject(
@@ -58,6 +63,23 @@ public class DashScopeClient {
 
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private String formatContext(List<AIQuestionRequest.ContextMessage> context) {
+        if (context == null || context.isEmpty()) {
+            return "最近对话上下文：无";
+        }
+
+        StringBuilder builder = new StringBuilder("最近对话上下文：\n");
+        context.stream()
+                .filter(message -> message != null && hasText(message.content()))
+                .filter(message -> "user".equals(message.role()) || "assistant".equals(message.role()))
+                .forEach(message -> builder
+                        .append("user".equals(message.role()) ? "用户：" : "助手：")
+                        .append(message.content().trim())
+                        .append('\n'));
+
+        return builder.toString().trim();
     }
 
     private record DashScopeRequest(String model, Input input, Parameters parameters) {

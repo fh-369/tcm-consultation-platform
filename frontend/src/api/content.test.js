@@ -34,10 +34,17 @@ describe('content and AI API', () => {
     request.post.mockResolvedValue({ data: { code: 200, data: { answer: '建议规律作息' } } })
     const { askAI } = await import('./content')
 
-    await askAI('最近睡眠不好怎么办？')
+    await askAI('最近睡眠不好怎么办？', [
+      { role: 'user', content: '我最近总是下午疲倦' },
+      { role: 'assistant', content: '可以先观察作息和饮食' },
+    ])
 
     expect(request.post).toHaveBeenCalledWith('/patient/ai/question', {
       question: '最近睡眠不好怎么办？',
+      context: [
+        { role: 'user', content: '我最近总是下午疲倦' },
+        { role: 'assistant', content: '可以先观察作息和饮食' },
+      ],
     })
   })
 

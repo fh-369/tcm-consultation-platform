@@ -30,8 +30,8 @@ export async function getPublishedRecipeDetail(id) {
   return unwrapResult(await request.get(`/patient/recipe/${id}`))
 }
 
-export async function askAI(question) {
-  return unwrapResult(await request.post('/patient/ai/question', { question }))
+export async function askAI(question, context = []) {
+  return unwrapResult(await request.post('/patient/ai/question', { question, context }))
 }
 
 export async function getDashboardSummary() {

@@ -1,8 +1,11 @@
 package com.tcm.platform.service;
 
 import com.tcm.platform.dto.AIAnswerResponse;
+import com.tcm.platform.dto.AIQuestionRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 /**
  * AI 养生问答业务，外部服务不可用时提供保守的 fallback 回答。
@@ -27,6 +30,10 @@ public class AIService {
     }
 
     public AIAnswerResponse answer(String question) {
+        return answer(question, List.of());
+    }
+
+    public AIAnswerResponse answer(String question, List<AIQuestionRequest.ContextMessage> context) {
         if (!hasText(question)) {
             throw new IllegalArgumentException("问题不能为空");
         }
@@ -35,10 +42,14 @@ public class AIService {
         }
 
         try {
-            return new AIAnswerResponse(dashScopeClient.ask(apiKey, question.trim()), false, DISCLAIMER);
+            return new AIAnswerResponse(dashScopeClient.ask(apiKey, question.trim(), safeContext(context)), false, DISCLAIMER);
         } catch (RuntimeException ex) {
             return fallback();
         }
+    }
+
+    private List<AIQuestionRequest.ContextMessage> safeContext(List<AIQuestionRequest.ContextMessage> context) {
+        return context == null ? List.of() : context;
     }
 
     private AIAnswerResponse fallback() {
