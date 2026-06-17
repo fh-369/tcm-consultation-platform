@@ -31,14 +31,20 @@ class DashScopeClientTest {
                 .andExpect(header("Authorization", "Bearer test-key"))
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.model").value("qwen-plus"))
-                .andExpect(jsonPath("$.input.prompt").value(containsString("你是一名中医养生助手")))
-                .andExpect(jsonPath("$.input.prompt").value(containsString("春季如何调养？")))
-                .andExpect(jsonPath("$.parameters.result_format").value("text"))
+                .andExpect(jsonPath("$.messages[0].role").value("system"))
+                .andExpect(jsonPath("$.messages[0].content").value(containsString("你是一名中医养生助手")))
+                .andExpect(jsonPath("$.messages[1].role").value("user"))
+                .andExpect(jsonPath("$.messages[1].content").value("春季如何调养？"))
                 .andRespond(withSuccess("""
                         {
-                          "output": {
-                            "text": "建议规律作息。"
-                          }
+                          "choices": [
+                            {
+                              "message": {
+                                "role": "assistant",
+                                "content": "建议规律作息。"
+                              }
+                            }
+                          ]
                         }
                         """, MediaType.APPLICATION_JSON));
         DashScopeClient client = new DashScopeClient(restTemplate, url, "qwen-plus");
@@ -60,15 +66,23 @@ class DashScopeClientTest {
                 new AIQuestionRequest.ContextMessage("system", "这条非法角色应被忽略")
         );
         server.expect(once(), requestTo(url))
-                .andExpect(jsonPath("$.input.prompt").value(containsString("最近对话上下文")))
-                .andExpect(jsonPath("$.input.prompt").value(containsString("用户：我最近下午容易疲倦")))
-                .andExpect(jsonPath("$.input.prompt").value(containsString("助手：可以先看作息和饮食")))
-                .andExpect(jsonPath("$.input.prompt").value(containsString("用户当前问题：那晚饭要注意什么？")))
+                .andExpect(jsonPath("$.messages[0].role").value("system"))
+                .andExpect(jsonPath("$.messages[1].role").value("user"))
+                .andExpect(jsonPath("$.messages[1].content").value("我最近下午容易疲倦"))
+                .andExpect(jsonPath("$.messages[2].role").value("assistant"))
+                .andExpect(jsonPath("$.messages[2].content").value("可以先看作息和饮食"))
+                .andExpect(jsonPath("$.messages[3].role").value("user"))
+                .andExpect(jsonPath("$.messages[3].content").value("那晚饭要注意什么？"))
                 .andRespond(withSuccess("""
                         {
-                          "output": {
-                            "text": "晚饭建议清淡适量。"
-                          }
+                          "choices": [
+                            {
+                              "message": {
+                                "role": "assistant",
+                                "content": "晚饭建议清淡适量。"
+                              }
+                            }
+                          ]
                         }
                         """, MediaType.APPLICATION_JSON));
         DashScopeClient client = new DashScopeClient(restTemplate, url, "qwen-plus");

@@ -39,13 +39,17 @@ describe('content and AI API', () => {
       { role: 'assistant', content: '可以先观察作息和饮食' },
     ])
 
-    expect(request.post).toHaveBeenCalledWith('/patient/ai/question', {
-      question: '最近睡眠不好怎么办？',
-      context: [
-        { role: 'user', content: '我最近总是下午疲倦' },
-        { role: 'assistant', content: '可以先观察作息和饮食' },
-      ],
-    })
+    expect(request.post).toHaveBeenCalledWith(
+      '/patient/ai/question',
+      {
+        question: '最近睡眠不好怎么办？',
+        context: [
+          { role: 'user', content: '我最近总是下午疲倦' },
+          { role: 'assistant', content: '可以先观察作息和饮食' },
+        ],
+      },
+      { timeout: 60000 },
+    )
   })
 
   it('manages admin content through the correct resource path', async () => {

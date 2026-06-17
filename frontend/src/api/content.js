@@ -31,7 +31,7 @@ export async function getPublishedRecipeDetail(id) {
 }
 
 export async function askAI(question, context = []) {
-  return unwrapResult(await request.post('/patient/ai/question', { question, context }))
+  return unwrapResult(await request.post('/patient/ai/question', { question, context }, { timeout: 60000 }))
 }
 
 export async function getDashboardSummary() {

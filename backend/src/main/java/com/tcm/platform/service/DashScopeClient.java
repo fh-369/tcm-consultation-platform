@@ -8,21 +8,18 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 阿里云 DashScope 文本生成 API 客户端。
+ * 阿里云 DashScope OpenAI 兼容模式客户端。
  */
 @Component
 public class DashScopeClient {
 
-    private static final String PROMPT_TEMPLATE = """
+    private static final String SYSTEM_PROMPT = """
             你是一名中医养生助手。请仅提供一般性的生活调养建议，不要进行诊断、开具处方或替代医生。
             回答应简洁、谨慎，并提醒用户：症状严重、持续或出现危险信号时应及时就医。
-
-            %s
-
-            用户当前问题：%s
             """;
 
     private final RestTemplate restTemplate;
@@ -46,8 +43,7 @@ public class DashScopeClient {
 
         DashScopeRequest request = new DashScopeRequest(
                 model,
-                new Input(PROMPT_TEMPLATE.formatted(formatContext(context), question)),
-                new Parameters("text")
+                buildMessages(question, context)
         );
         DashScopeResponse response = restTemplate.postForObject(
                 baseUrl,
@@ -55,45 +51,53 @@ public class DashScopeClient {
                 DashScopeResponse.class
         );
 
-        if (response == null || response.output() == null || !hasText(response.output().text())) {
+        String answer = extractAnswer(response);
+        if (!hasText(answer)) {
             throw new IllegalStateException("DashScope 未返回有效回答");
         }
-        return response.output().text().trim();
+        return answer.trim();
     }
 
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
     }
 
-    private String formatContext(List<AIQuestionRequest.ContextMessage> context) {
-        if (context == null || context.isEmpty()) {
-            return "最近对话上下文：无";
+    private List<Message> buildMessages(String question, List<AIQuestionRequest.ContextMessage> context) {
+        List<Message> messages = new ArrayList<>();
+        messages.add(new Message("system", SYSTEM_PROMPT.trim()));
+
+        if (context != null) {
+            context.stream()
+                    .filter(message -> message != null && hasText(message.content()))
+                    .filter(message -> "user".equals(message.role()) || "assistant".equals(message.role()))
+                    .map(message -> new Message(message.role(), message.content().trim()))
+                    .forEach(messages::add);
         }
 
-        StringBuilder builder = new StringBuilder("最近对话上下文：\n");
-        context.stream()
-                .filter(message -> message != null && hasText(message.content()))
-                .filter(message -> "user".equals(message.role()) || "assistant".equals(message.role()))
-                .forEach(message -> builder
-                        .append("user".equals(message.role()) ? "用户：" : "助手：")
-                        .append(message.content().trim())
-                        .append('\n'));
-
-        return builder.toString().trim();
+        messages.add(new Message("user", question));
+        return messages;
     }
 
-    private record DashScopeRequest(String model, Input input, Parameters parameters) {
+    private String extractAnswer(DashScopeResponse response) {
+        if (response == null || response.choices() == null || response.choices().isEmpty()) {
+            return null;
+        }
+        Choice firstChoice = response.choices().get(0);
+        if (firstChoice == null || firstChoice.message() == null) {
+            return null;
+        }
+        return firstChoice.message().content();
     }
 
-    private record Input(String prompt) {
+    private record DashScopeRequest(String model, List<Message> messages) {
     }
 
-    private record Parameters(String result_format) {
+    private record Message(String role, String content) {
     }
 
-    private record DashScopeResponse(Output output) {
+    private record DashScopeResponse(List<Choice> choices) {
     }
 
-    private record Output(String text) {
+    private record Choice(Message message) {
     }
 }
