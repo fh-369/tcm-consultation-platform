@@ -6,6 +6,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
@@ -45,11 +46,19 @@ public class DashScopeClient {
                 model,
                 buildMessages(question, context)
         );
-        DashScopeResponse response = restTemplate.postForObject(
-                baseUrl,
-                new HttpEntity<>(request, headers),
-                DashScopeResponse.class
-        );
+        DashScopeResponse response;
+        try {
+            response = restTemplate.postForObject(
+                    baseUrl,
+                    new HttpEntity<>(request, headers),
+                    DashScopeResponse.class
+            );
+        } catch (RestClientResponseException ex) {
+            throw new IllegalStateException(
+                    "DashScope 调用失败: HTTP " + ex.getRawStatusCode() + " " + ex.getResponseBodyAsString(),
+                    ex
+            );
+        }
 
         String answer = extractAnswer(response);
         if (!hasText(answer)) {

@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.Duration;
@@ -18,6 +19,17 @@ import java.time.Duration;
  */
 @Configuration
 public class AppConfig {
+
+    private final Duration connectTimeout;
+    private final Duration readTimeout;
+
+    public AppConfig(
+            @Value("${http.client.connect-timeout:5s}") Duration connectTimeout,
+            @Value("${http.client.read-timeout:60s}") Duration readTimeout
+    ) {
+        this.connectTimeout = connectTimeout;
+        this.readTimeout = readTimeout;
+    }
 
     /**
      * 密码编码器 - 使用 BCrypt 加密算法
@@ -33,8 +45,8 @@ public class AppConfig {
     @Bean
     public RestTemplate restTemplate() {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(Duration.ofSeconds(5));
-        requestFactory.setReadTimeout(Duration.ofSeconds(15));
+        requestFactory.setConnectTimeout(connectTimeout);
+        requestFactory.setReadTimeout(readTimeout);
         return new RestTemplate(requestFactory);
     }
 }

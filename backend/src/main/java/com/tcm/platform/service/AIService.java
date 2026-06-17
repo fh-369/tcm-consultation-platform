@@ -2,6 +2,8 @@ package com.tcm.platform.service;
 
 import com.tcm.platform.dto.AIAnswerResponse;
 import com.tcm.platform.dto.AIQuestionRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -12,6 +14,8 @@ import java.util.List;
  */
 @Service
 public class AIService {
+
+    private static final Logger log = LoggerFactory.getLogger(AIService.class);
 
     private static final String DISCLAIMER = "本回答仅供一般养生参考，不能替代医生诊断和治疗。";
     private static final String FALLBACK_ANSWER =
@@ -44,6 +48,7 @@ public class AIService {
         try {
             return new AIAnswerResponse(dashScopeClient.ask(apiKey, question.trim(), safeContext(context)), false, DISCLAIMER);
         } catch (RuntimeException ex) {
+            log.warn("DashScope AI answer failed: {}", ex.getMessage());
             return fallback();
         }
     }

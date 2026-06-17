@@ -6,6 +6,11 @@
 server:
   port: 8080
 
+http:
+  client:
+    connect-timeout: 5s
+    read-timeout: 60s
+
 spring:
   application:
     name: tcm-platform

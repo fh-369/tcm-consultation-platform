@@ -3,12 +3,14 @@ package com.tcm.platform.service;
 import com.tcm.platform.dto.AIQuestionRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.client.ExpectedCount.once;
@@ -17,6 +19,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 class DashScopeClientTest {
@@ -90,6 +93,30 @@ class DashScopeClientTest {
         String answer = client.ask("test-key", "那晚饭要注意什么？", context);
 
         assertThat(answer).isEqualTo("晚饭建议清淡适量。");
+        server.verify();
+    }
+
+    @Test
+    void askThrowsHelpfulMessageWhenDashScopeReturnsError() {
+        RestTemplate restTemplate = new RestTemplate();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
+        String url = "https://example.test/dashscope";
+        server.expect(once(), requestTo(url))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body("""
+                                {
+                                  "code": "InvalidParameter",
+                                  "message": "model glm-5 is not available"
+                                }
+                                """));
+        DashScopeClient client = new DashScopeClient(restTemplate, url, "glm-5");
+
+        assertThatThrownBy(() -> client.ask("test-key", "你好", List.of()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("DashScope 调用失败")
+                .hasMessageContaining("400")
+                .hasMessageContaining("model glm-5 is not available");
         server.verify();
     }
 }
