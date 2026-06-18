@@ -9,6 +9,13 @@ const request = {
 
 vi.mock('./request', () => ({ default: request }))
 
+vi.mock('../stores/authSession', () => ({
+  getBrowserStorage: () => ({
+    getItem: () => JSON.stringify({ token: 'stream-token' }),
+  }),
+  loadSession: () => ({ token: 'stream-token' }),
+}))
+
 describe('content and AI API', () => {
   beforeEach(() => {
     Object.values(request).forEach((mock) => mock.mockReset())
@@ -50,6 +57,49 @@ describe('content and AI API', () => {
       },
       { timeout: 60000 },
     )
+  })
+
+  it('streams the patient AI endpoint and emits decoded chunks', async () => {
+    const encoder = new TextEncoder()
+    const chunks = ['建议先', '清淡饮食。']
+    const controller = new AbortController()
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      body: new ReadableStream({
+        start(controller) {
+          chunks.forEach((chunk) => controller.enqueue(encoder.encode(chunk)))
+          controller.close()
+        },
+      }),
+    })
+    const { askAIStream } = await import('./content')
+    const received = []
+
+    await askAIStream({
+      question: '胃口不好怎么办？',
+      context: [{ role: 'user', content: '我想结合问诊单' }],
+      consultationId: 12,
+      onChunk: (chunk) => received.push(chunk),
+      signal: controller.signal,
+    })
+
+    expect(fetch).toHaveBeenCalledWith(
+      'http://localhost:8080/api/patient/ai/question/stream',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          Authorization: 'Bearer stream-token',
+          'Content-Type': 'application/json',
+        }),
+        body: JSON.stringify({
+          question: '胃口不好怎么办？',
+          context: [{ role: 'user', content: '我想结合问诊单' }],
+          consultationId: 12,
+        }),
+        signal: controller.signal,
+      }),
+    )
+    expect(received).toEqual(chunks)
   })
 
   it('manages admin content through the correct resource path', async () => {

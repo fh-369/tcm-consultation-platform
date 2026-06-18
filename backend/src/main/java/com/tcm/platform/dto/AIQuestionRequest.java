@@ -20,6 +20,8 @@ public class AIQuestionRequest {
     @Size(max = 12, message = "上下文消息不能超过12条")
     private List<ContextMessage> context = new ArrayList<>();
 
+    private Long consultationId;
+
     public List<ContextMessage> getContext() {
         return context == null ? List.of() : context;
     }

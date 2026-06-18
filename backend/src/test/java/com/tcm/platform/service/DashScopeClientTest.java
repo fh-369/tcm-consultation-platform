@@ -9,6 +9,7 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
+import java.util.ArrayList;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -117,6 +118,34 @@ class DashScopeClientTest {
                 .hasMessageContaining("DashScope 调用失败")
                 .hasMessageContaining("400")
                 .hasMessageContaining("model glm-5 is not available");
+        server.verify();
+    }
+
+    @Test
+    void askStreamSendsStreamRequestAndEmitsDeltaContent() {
+        RestTemplate restTemplate = new RestTemplate();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
+        String url = "https://example.test/dashscope";
+        server.expect(once(), requestTo(url))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(header("Authorization", "Bearer test-key"))
+                .andExpect(jsonPath("$.model").value("qwen-plus"))
+                .andExpect(jsonPath("$.stream").value(true))
+                .andExpect(jsonPath("$.messages[1].content").value("最近胃口不好怎么办？"))
+                .andRespond(withSuccess("""
+                        data: {"choices":[{"delta":{"content":"建议先"}}]}
+
+                        data: {"choices":[{"delta":{"content":"清淡饮食。"}}]}
+
+                        data: [DONE]
+
+                        """, MediaType.TEXT_EVENT_STREAM));
+        DashScopeClient client = new DashScopeClient(restTemplate, url, "qwen-plus");
+        List<String> chunks = new ArrayList<>();
+
+        client.askStream("test-key", "最近胃口不好怎么办？", List.of(), chunks::add);
+
+        assertThat(chunks).containsExactly("建议先", "清淡饮食。");
         server.verify();
     }
 }

@@ -41,15 +41,19 @@ import java.util.Map;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = {
@@ -186,7 +190,7 @@ class ApiSystemTest {
         when(consultationService.createConsultation(any())).thenReturn(consultation);
         when(consultationService.listConsultations(anyLong(), anyLong(), any(), any(), eq(8L), any()))
                 .thenReturn(new Page<>());
-        when(aiService.answer("春季如何调养？"))
+        when(aiService.answer(eq("春季如何调养？"), any(), eq(8L), eq(null)))
                 .thenReturn(new AIAnswerResponse("规律作息，适量运动。", true, "不能替代医生诊断。"));
 
         mockMvc.perform(post("/api/patient/consultation")
@@ -217,6 +221,32 @@ class ApiSystemTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.fallback").value(true))
                 .andExpect(jsonPath("$.data.disclaimer").value("不能替代医生诊断。"));
+    }
+
+    @Test
+    @WithMockUser(username = "patient1", roles = "PATIENT")
+    void patientCanUseStreamingAIEndpointAcrossAsyncDispatch() throws Exception {
+        PatientAccount patient = new PatientAccount();
+        patient.setId(8L);
+        patient.setUsername("patient1");
+        when(patientAccountMapper.selectOne(any())).thenReturn(patient);
+        doAnswer(invocation -> {
+            java.util.function.Consumer<String> consumer = invocation.getArgument(4);
+            consumer.accept("建议先清淡饮食。");
+            return null;
+        }).when(aiService).streamAnswer(eq("结合问诊单怎么调养？"), any(), eq(8L), eq(10L), any());
+
+        var mvcResult = mockMvc.perform(post("/api/patient/ai/question/stream")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"question":"结合问诊单怎么调养？","consultationId":10}
+                                """))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+
+        mockMvc.perform(asyncDispatch(mvcResult))
+                .andExpect(status().isOk())
+                .andExpect(content().string("建议先清淡饮食。"));
     }
 
     @Test
@@ -259,6 +289,16 @@ class ApiSystemTest {
 
         mockMvc.perform(get("/api/admin/dashboard"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void corsPreflightForStreamingAIEndpointIsAllowed() throws Exception {
+        mockMvc.perform(options("/api/patient/ai/question/stream")
+                        .header("Origin", "http://localhost:5173")
+                        .header("Access-Control-Request-Method", "POST")
+                        .header("Access-Control-Request-Headers", "authorization,content-type"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"));
     }
 
     @Test

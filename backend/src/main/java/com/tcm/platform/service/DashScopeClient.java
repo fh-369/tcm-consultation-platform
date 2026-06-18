@@ -1,6 +1,9 @@
 package com.tcm.platform.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tcm.platform.dto.AIQuestionRequest;
+import org.springframework.http.HttpMethod;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -9,8 +12,13 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestTemplate;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * 阿里云 DashScope OpenAI 兼容模式客户端。
@@ -26,6 +34,7 @@ public class DashScopeClient {
     private final RestTemplate restTemplate;
     private final String baseUrl;
     private final String model;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public DashScopeClient(
             RestTemplate restTemplate,
@@ -67,6 +76,50 @@ public class DashScopeClient {
         return answer.trim();
     }
 
+    public void askStream(
+            String apiKey,
+            String question,
+            List<AIQuestionRequest.ContextMessage> context,
+            Consumer<String> chunkConsumer
+    ) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(apiKey);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setAccept(List.of(MediaType.TEXT_EVENT_STREAM));
+
+        DashScopeStreamRequest request = new DashScopeStreamRequest(
+                model,
+                buildMessages(question, context),
+                true
+        );
+
+        try {
+            restTemplate.execute(
+                    baseUrl,
+                    HttpMethod.POST,
+                    clientHttpRequest -> {
+                        clientHttpRequest.getHeaders().putAll(headers);
+                        objectMapper.writeValue(clientHttpRequest.getBody(), request);
+                    },
+                    clientHttpResponse -> {
+                        if (clientHttpResponse.getStatusCode().isError()) {
+                            String body = new String(clientHttpResponse.getBody().readAllBytes(), StandardCharsets.UTF_8);
+                            throw new IllegalStateException(
+                                    "DashScope 调用失败: HTTP " + clientHttpResponse.getStatusCode().value() + " " + body
+                            );
+                        }
+                        readStream(clientHttpResponse.getBody(), chunkConsumer);
+                        return null;
+                    }
+            );
+        } catch (RestClientResponseException ex) {
+            throw new IllegalStateException(
+                    "DashScope 调用失败: HTTP " + ex.getRawStatusCode() + " " + ex.getResponseBodyAsString(),
+                    ex
+            );
+        }
+    }
+
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
     }
@@ -98,7 +151,38 @@ public class DashScopeClient {
         return firstChoice.message().content();
     }
 
+    private void readStream(java.io.InputStream inputStream, Consumer<String> chunkConsumer) throws IOException {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (!line.startsWith("data:")) {
+                    continue;
+                }
+                String payload = line.substring("data:".length()).trim();
+                if ("[DONE]".equals(payload)) {
+                    return;
+                }
+                String content = extractDeltaContent(payload);
+                if (hasText(content)) {
+                    chunkConsumer.accept(content);
+                }
+            }
+        }
+    }
+
+    private String extractDeltaContent(String payload) throws IOException {
+        JsonNode root = objectMapper.readTree(payload);
+        JsonNode choices = root.path("choices");
+        if (!choices.isArray() || choices.isEmpty()) {
+            return "";
+        }
+        return choices.get(0).path("delta").path("content").asText("");
+    }
+
     private record DashScopeRequest(String model, List<Message> messages) {
+    }
+
+    private record DashScopeStreamRequest(String model, List<Message> messages, boolean stream) {
     }
 
     private record Message(String role, String content) {

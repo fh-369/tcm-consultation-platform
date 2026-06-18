@@ -94,6 +94,17 @@ public class ConsultationService {
         return consultation;
     }
 
+    public Consultation getPatientConsultation(Long id, Long patientAccountId) {
+        if (patientAccountId == null) {
+            throw new IllegalArgumentException("患者账号 ID 不能为空");
+        }
+        Consultation consultation = getConsultationById(id);
+        if (!patientAccountId.equals(consultation.getPatientAccountId())) {
+            throw new IllegalArgumentException("问诊单不存在或无权访问");
+        }
+        return consultation;
+    }
+
     @Transactional
     public Consultation updateConsultation(Long id, ConsultationUpdateRequest request) {
         Consultation consultation = getConsultationById(id);
