@@ -1,6 +1,7 @@
 package com.tcm.platform.service;
 
 import com.tcm.platform.dto.AIAnswerResponse;
+import com.tcm.platform.dto.AIContentRecommendation;
 import com.tcm.platform.dto.AIQuestionRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -91,6 +92,13 @@ public class AIService {
             log.warn("DashScope AI answer failed: {}", ex.getMessage());
             chunkConsumer.accept(FALLBACK_ANSWER);
         }
+    }
+
+    public List<AIContentRecommendation> findRecommendations(String question) {
+        if (!hasText(question)) {
+            throw new IllegalArgumentException("问题不能为空");
+        }
+        return aiContextService.findRecommendations(question.trim());
     }
 
     private List<AIQuestionRequest.ContextMessage> safeContext(List<AIQuestionRequest.ContextMessage> context) {

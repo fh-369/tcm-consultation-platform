@@ -1,6 +1,7 @@
 package com.tcm.platform.service;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.tcm.platform.dto.AIContentRecommendation;
 import com.tcm.platform.dto.AIQuestionRequest;
 import com.tcm.platform.entity.Consultation;
 import com.tcm.platform.entity.KnowledgeArticle;
@@ -8,11 +9,13 @@ import com.tcm.platform.entity.Recipe;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 /**
- * 为 AI 问答组装平台内可参考的知识、药膳和问诊单上下文。
+ * 为 AI 问答组装问诊单上下文，并独立检索站内延伸阅读。
  */
 @Service
 public class AIContextService {
@@ -42,55 +45,138 @@ public class AIContextService {
             result.addAll(existingContext);
         }
 
-        String reference = buildReference(question, patientAccountId, consultationId);
+        String reference = buildConsultationContext(patientAccountId, consultationId);
         if (hasText(reference)) {
             result.add(new AIQuestionRequest.ContextMessage("user", reference));
         }
         return result;
     }
 
-    private String buildReference(String question, Long patientAccountId, Long consultationId) {
-        List<String> sections = new ArrayList<>();
-        List<KnowledgeArticle> articles = records(knowledgeArticleService.listPublishedArticles(1, 3, null, question));
-        List<Recipe> recipes = records(recipeService.listRecipes(1, 3, null, null, true, question));
-
-        if (!articles.isEmpty() || !recipes.isEmpty()) {
-            sections.add(buildPlatformReference(articles, recipes));
-        }
-        if (consultationId != null) {
-            sections.add(buildConsultationReference(consultationService.getPatientConsultation(consultationId, patientAccountId)));
+    public List<AIContentRecommendation> findRecommendations(String question) {
+        if (!hasText(question)) {
+            return List.of();
         }
 
-        if (sections.isEmpty()) {
-            return "";
+        List<KnowledgeArticle> articles = records(knowledgeArticleService.listPublishedArticles(1, 100, null, null));
+        List<Recipe> recipes = records(recipeService.listRecipes(1, 100, null, null, true, null));
+        List<AIContentRecommendation> recommendations = new ArrayList<>();
+
+        for (KnowledgeArticle article : rankArticles(question, articles)) {
+            recommendations.add(new AIContentRecommendation(
+                    article.getId(),
+                    "knowledge",
+                    text(article.getTitle()),
+                    shorten(firstText(article.getSummary(), article.getContent()), 90)
+            ));
         }
-        return "以下是平台参考资料。请优先结合这些资料回答，保持谨慎，不要诊断或开方：\n\n"
-                + String.join("\n\n", sections);
+        for (Recipe recipe : rankRecipes(question, recipes)) {
+            recommendations.add(new AIContentRecommendation(
+                    recipe.getId(),
+                    "recipe",
+                    text(recipe.getName()),
+                    shorten(firstText(recipe.getSummary(), recipe.getSuitableFor()), 90)
+            ));
+        }
+        return recommendations;
     }
 
-    private String buildPlatformReference(List<KnowledgeArticle> articles, List<Recipe> recipes) {
-        StringBuilder builder = new StringBuilder("【平台参考资料】");
-        for (KnowledgeArticle article : articles) {
-            builder.append("\n- 养生知识《")
-                    .append(text(article.getTitle()))
-                    .append("》")
-                    .append("（")
-                    .append(text(article.getCategory()))
-                    .append("）：")
-                    .append(shorten(firstText(article.getSummary(), article.getContent()), 180));
+    private List<KnowledgeArticle> rankArticles(String question, List<KnowledgeArticle> articles) {
+        return articles.stream()
+                .sorted(Comparator
+                        .comparingInt((KnowledgeArticle article) -> articleScore(question, article))
+                        .reversed()
+                        .thenComparing(KnowledgeArticle::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .limit(2)
+                .toList();
+    }
+
+    private List<Recipe> rankRecipes(String question, List<Recipe> recipes) {
+        return recipes.stream()
+                .sorted(Comparator
+                        .comparingInt((Recipe recipe) -> recipeScore(question, recipe))
+                        .reversed()
+                        .thenComparing(Recipe::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .limit(2)
+                .toList();
+    }
+
+    private int articleScore(String question, KnowledgeArticle article) {
+        return relevanceScore(
+                question,
+                String.join(" ",
+                        text(article.getTitle()),
+                        text(article.getCategory()),
+                        text(article.getSummary()),
+                        text(article.getContent())
+                )
+        );
+    }
+
+    private int recipeScore(String question, Recipe recipe) {
+        return relevanceScore(
+                question,
+                String.join(" ",
+                        text(recipe.getName()),
+                        text(recipe.getSeason()),
+                        text(recipe.getConstitution()),
+                        text(recipe.getSuitableFor()),
+                        text(recipe.getSummary()),
+                        text(recipe.getIngredients())
+                )
+        );
+    }
+
+    private int relevanceScore(String question, String content) {
+        String normalizedQuestion = normalize(question);
+        String normalizedContent = normalize(content);
+        int score = 0;
+
+        for (String keyword : recommendationKeywords()) {
+            if (normalizedQuestion.contains(keyword) && normalizedContent.contains(keyword)) {
+                score += keyword.length() > 1 ? 4 : 2;
+            }
         }
-        for (Recipe recipe : recipes) {
-            builder.append("\n- 药膳推荐《")
-                    .append(text(recipe.getName()))
-                    .append("》")
-                    .append("（")
-                    .append(text(recipe.getSeason()))
-                    .append(" · ")
-                    .append(text(recipe.getConstitution()))
-                    .append("）：")
-                    .append(shorten(firstText(recipe.getSummary(), recipe.getSuitableFor(), recipe.getIngredients()), 180));
+        for (Set<String> group : topicGroups()) {
+            boolean questionMatches = group.stream().anyMatch(normalizedQuestion::contains);
+            boolean contentMatches = group.stream().anyMatch(normalizedContent::contains);
+            if (questionMatches && contentMatches) {
+                score += 6;
+            }
         }
-        return builder.toString();
+        return score;
+    }
+
+    private List<String> recommendationKeywords() {
+        return List.of(
+                "春", "夏", "秋", "冬", "睡眠", "失眠", "作息", "疲倦", "乏力", "饮食",
+                "胃口", "胃", "消化", "运动", "久坐", "情绪", "压力", "焦虑", "补水",
+                "上火", "寒", "咳嗽", "感冒", "头痛", "女性", "老人"
+        );
+    }
+
+    private List<Set<String>> topicGroups() {
+        return List.of(
+                Set.of("睡眠", "失眠", "入睡", "熬夜", "作息"),
+                Set.of("胃口", "胃", "消化", "饮食", "饭", "食欲"),
+                Set.of("疲倦", "乏力", "疲劳", "精神"),
+                Set.of("运动", "锻炼", "久坐", "步行"),
+                Set.of("情绪", "压力", "焦虑", "心情"),
+                Set.of("感冒", "咳嗽", "鼻塞", "发热"),
+                Set.of("春", "夏", "秋", "冬", "季节", "节气")
+        );
+    }
+
+    private String normalize(String value) {
+        return text(value).toLowerCase().replaceAll("[\\s，。！？、；：,.!?;:]+", "");
+    }
+
+    private String buildConsultationContext(Long patientAccountId, Long consultationId) {
+        if (consultationId == null) {
+            return "";
+        }
+        return buildConsultationReference(
+                consultationService.getPatientConsultation(consultationId, patientAccountId)
+        );
     }
 
     private String buildConsultationReference(Consultation consultation) {

@@ -3,6 +3,7 @@ package com.tcm.platform.controller;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.tcm.platform.common.Result;
 import com.tcm.platform.dto.AIAnswerResponse;
+import com.tcm.platform.dto.AIContentRecommendation;
 import com.tcm.platform.dto.AIQuestionRequest;
 import com.tcm.platform.entity.PatientAccount;
 import com.tcm.platform.mapper.PatientAccountMapper;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 /**
  * 患者 AI 养生问答接口。
@@ -68,6 +70,13 @@ public class AIController {
         return ResponseEntity.ok()
                 .contentType(new MediaType("text", "plain", StandardCharsets.UTF_8))
                 .body(body);
+    }
+
+    @PostMapping("/recommendations")
+    public Result<List<AIContentRecommendation>> recommendations(
+            @Valid @RequestBody AIQuestionRequest request
+    ) {
+        return Result.success(aiService.findRecommendations(request.getQuestion()));
     }
 
     private PatientAccount currentPatient(Authentication authentication) {

@@ -119,6 +119,26 @@ class AIServiceTest {
         verify(aiContextService).enrichContext("胃口不好怎么调养？", context, 7L, 12L);
     }
 
+    @Test
+    void returnsPlatformRecommendationsSeparatelyFromModelContext() {
+        DashScopeClient dashScopeClient = mock(DashScopeClient.class);
+        AIContextService aiContextService = mock(AIContextService.class);
+        var recommendation = new com.tcm.platform.dto.AIContentRecommendation(
+                6L,
+                "knowledge",
+                "一餐如何吃得更均衡",
+                "从食物种类与比例开始调整。"
+        );
+        when(aiContextService.findRecommendations("晚饭怎么吃？")).thenReturn(List.of(recommendation));
+        AIService service = service(dashScopeClient, "test-key", aiContextService);
+
+        var result = service.findRecommendations(" 晚饭怎么吃？ ");
+
+        assertThat(result).containsExactly(recommendation);
+        verify(aiContextService).findRecommendations("晚饭怎么吃？");
+        verifyNoInteractions(dashScopeClient);
+    }
+
     private AIService service(DashScopeClient dashScopeClient, String apiKey, AIContextService aiContextService) {
         return new AIService(dashScopeClient, aiContextService, apiKey);
     }

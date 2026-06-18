@@ -102,6 +102,26 @@ describe('content and AI API', () => {
     expect(received).toEqual(chunks)
   })
 
+  it('loads platform recommendations separately from the AI answer', async () => {
+    request.post.mockResolvedValue({
+      data: {
+        code: 200,
+        data: [
+          { id: 6, type: 'knowledge', title: '一餐如何吃得更均衡' },
+          { id: 9, type: 'recipe', title: '山药香菇鸡肉粥' },
+        ],
+      },
+    })
+    const { getAIRecommendations } = await import('./content')
+
+    const result = await getAIRecommendations('晚饭怎么吃？')
+
+    expect(request.post).toHaveBeenCalledWith('/patient/ai/recommendations', {
+      question: '晚饭怎么吃？',
+    })
+    expect(result).toHaveLength(2)
+  })
+
   it('manages admin content through the correct resource path', async () => {
     request.get.mockResolvedValue({ data: { code: 200, data: { records: [] } } })
     request.post.mockResolvedValue({ data: { code: 200, data: { id: 1 } } })

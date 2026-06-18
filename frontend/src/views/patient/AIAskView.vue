@@ -3,8 +3,9 @@ import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import DOMPurify from 'dompurify'
 import MarkdownIt from 'markdown-it'
+import { useRouter } from 'vue-router'
 
-import { askAIStream } from '../../api/content'
+import { askAIStream, getAIRecommendations } from '../../api/content'
 import { getMyConsultations } from '../../api/consultation'
 import {
   buildAIContext,
@@ -17,6 +18,7 @@ import {
 } from '../../features/ai/session'
 
 const STORAGE_KEY = 'tcm-ai-conversations'
+const router = useRouter()
 const input = ref('')
 const activeId = ref('')
 const conversations = ref([])
@@ -103,6 +105,10 @@ function renderMarkdown(content) {
   return DOMPurify.sanitize(markdown.render(content || ''))
 }
 
+function openRecommendation(item) {
+  router.push(item.type === 'knowledge' ? `/knowledge/${item.id}` : `/recipes/${item.id}`)
+}
+
 function handleComposerKeydown(event) {
   if (event.key !== 'Enter') return
   if (event.shiftKey) return
@@ -158,9 +164,10 @@ async function submit() {
   const context = buildAIContext(conversation.messages)
   appendMessage(conversation, createUserMessage(question))
   const assistantMessage = reactive(createAssistantMessage('', {
-    disclaimer: '本回答结合平台内容生成，仅供一般养护参考，不能替代医生诊断和治疗。',
+    disclaimer: '本回答仅供一般养护参考，不能替代医生诊断和治疗。',
   }))
   assistantMessage.streaming = true
+  assistantMessage.recommendations = []
   const renderedAssistantMessage = appendMessage(conversation, assistantMessage)
   const controller = new AbortController()
   activeRequest.value = {
@@ -187,6 +194,11 @@ async function submit() {
     if (!receivedAnswer.trim() && !renderedAssistantMessage.content.trim()) {
       renderedAssistantMessage.fallback = true
       renderedAssistantMessage.content = '暂时无法获取智能回答。建议保持规律作息、均衡饮食和适量运动；如症状严重、持续不缓解或出现明显不适，请及时就医。'
+    }
+    try {
+      renderedAssistantMessage.recommendations = await getAIRecommendations(question)
+    } catch {
+      renderedAssistantMessage.recommendations = []
     }
   } catch (error) {
     if (error.name === 'AbortError') {
@@ -228,11 +240,11 @@ watch(conversations, saveConversations, { deep: true })
         </button>
         <div v-if="helpVisible" class="ai-guide">
           <strong>AI养护问答可以做什么？</strong>
-          <p>它会优先参考平台里的养生知识与药膳推荐，再结合你选择的问诊单，生成更贴近日常情况的养护建议。</p>
+          <p>它可以结合你选择的问诊单提供一般养护建议，并根据问题推荐平台内值得继续阅读的内容。</p>
           <ul>
             <li>可选择一张问诊单作为本轮对话依据</li>
-            <li>会参考已发布的养生知识和药膳内容</li>
-            <li>建议仅用于健康科普，不替代医生诊断</li>
+            <li>回答后推荐相关养生文章和药膳详情</li>
+            <li>内容仅用于健康科普，不替代医生诊断或处方</li>
           </ul>
         </div>
         <div class="conversation-list">
@@ -292,12 +304,28 @@ watch(conversations, saveConversations, { deep: true })
             <span>{{ message.role === 'user' ? '我' : (message.fallback ? '基础建议模式' : 'AI 参考建议') }}</span>
             <p v-if="message.content && message.streaming" class="streaming-text">{{ message.content }}</p>
             <div v-else-if="message.content" class="markdown-body" v-html="renderMarkdown(message.content)"></div>
-            <p v-else class="typing-placeholder">正在结合问诊单、养生知识和药膳推荐整理回答……</p>
+            <p v-else class="typing-placeholder">正在结合当前对话与所选问诊单整理回答……</p>
             <i
               v-if="message.streaming"
               class="stream-cursor"
               aria-hidden="true"
             ></i>
+            <div v-if="message.recommendations?.length" class="message-recommendations">
+              <strong>站内延伸阅读</strong>
+              <button
+                v-for="item in message.recommendations"
+                :key="`${item.type}-${item.id}`"
+                type="button"
+                @click="openRecommendation(item)"
+              >
+                <span>{{ item.type === 'knowledge' ? '养生知识' : '药膳推荐' }}</span>
+                <div>
+                  <b>{{ item.title }}</b>
+                  <small v-if="item.description">{{ item.description }}</small>
+                </div>
+                <i aria-hidden="true">→</i>
+              </button>
+            </div>
             <footer v-if="message.disclaimer">{{ message.disclaimer }}</footer>
           </article>
         </div>
@@ -398,6 +426,15 @@ watch(conversations, saveConversations, { deep: true })
 .markdown-body :deep(pre code) { padding: 0; background: transparent; color: inherit; }
 .stream-cursor { display: inline-block; width: 8px; height: 18px; margin: 6px 0 0 2px; border-radius: 999px; background: var(--color-cinnabar); animation: stream-cursor-blink .9s infinite; vertical-align: text-bottom; }
 @keyframes stream-cursor-blink { 0%, 45% { opacity: 1; } 46%, 100% { opacity: .18; } }
+.message-recommendations { display: grid; gap: 8px; margin-top: 16px; padding-top: 14px; border-top: 1px solid rgb(79 138 108 / 12%); }
+.message-recommendations > strong { margin: 0 0 2px; color: var(--color-ink); font-size: 12px; letter-spacing: .08em; }
+.message-recommendations button { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; width: 100%; padding: 11px 12px; border: 1px solid rgb(79 138 108 / 14%); border-radius: 16px; background: linear-gradient(135deg, rgb(248 252 249 / 96%), rgb(240 248 243 / 90%)); color: #405e51; cursor: pointer; text-align: left; transition: .18s ease; }
+.message-recommendations button:hover { border-color: rgb(79 138 108 / 34%); box-shadow: 0 9px 20px rgb(23 60 45 / 8%); transform: translateY(-1px); }
+.message-recommendations button > span { margin: 0; padding: 5px 8px; border-radius: 999px; background: rgb(79 138 108 / 11%); color: var(--color-ink); font-size: 10px; letter-spacing: 0; white-space: nowrap; }
+.message-recommendations button div { min-width: 0; }
+.message-recommendations button b { display: block; overflow: hidden; color: var(--color-ink); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.message-recommendations button small { display: -webkit-box; overflow: hidden; margin-top: 4px; color: var(--color-text-muted); font-size: 11px; line-height: 1.55; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.message-recommendations button > i { color: var(--color-cinnabar); font-size: 16px; font-style: normal; }
 .message footer { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgb(79 138 108 / 12%); color: var(--color-text-muted); font-size: 11px; line-height: 1.7; }
 .thinking .typing-placeholder { color: var(--color-text-muted); }
 .composer-wrap { padding: 10px 16px 14px; border-top: 1px solid rgb(79 138 108 / 12%); background: rgb(255 255 255 / 92%); }

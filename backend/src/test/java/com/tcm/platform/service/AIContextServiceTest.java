@@ -17,7 +17,7 @@ import static org.mockito.Mockito.when;
 class AIContextServiceTest {
 
     @Test
-    void enrichesContextWithPlatformContentAndSelectedConsultation() {
+    void keepsPlatformRecommendationsSeparateFromSelectedConsultationContext() {
         KnowledgeArticleService knowledgeArticleService = mock(KnowledgeArticleService.class);
         RecipeService recipeService = mock(RecipeService.class);
         ConsultationService consultationService = mock(ConsultationService.class);
@@ -42,9 +42,9 @@ class AIContextServiceTest {
         consultation.setUrgency("普通");
         consultation.setPatientNote("饭后有些反胃");
         consultation.setReminderText("建议保持观察。");
-        when(knowledgeArticleService.listPublishedArticles(1, 3, null, "最近胃口不好怎么调养？"))
+        when(knowledgeArticleService.listPublishedArticles(1, 100, null, null))
                 .thenReturn(pageOf(article));
-        when(recipeService.listRecipes(1, 3, null, null, true, "最近胃口不好怎么调养？"))
+        when(recipeService.listRecipes(1, 100, null, null, true, null))
                 .thenReturn(pageOf(recipe));
         when(consultationService.getPatientConsultation(12L, 7L)).thenReturn(consultation);
         List<AIQuestionRequest.ContextMessage> existing = List.of(
@@ -62,12 +62,19 @@ class AIContextServiceTest {
         assertThat(result.get(0).content()).isEqualTo("我最近吃得少");
         assertThat(result.get(1).role()).isEqualTo("user");
         assertThat(result.get(1).content())
-                .contains("平台参考资料")
-                .contains("晚餐如何吃得更均衡")
-                .contains("山药香菇鸡肉粥")
                 .contains("用户选择的问诊单")
                 .contains("最近胃口不好")
-                .contains("饭后有些反胃");
+                .contains("饭后有些反胃")
+                .doesNotContain("晚餐如何吃得更均衡")
+                .doesNotContain("山药香菇鸡肉粥");
+
+        var recommendations = service.findRecommendations("最近胃口不好怎么调养？");
+
+        assertThat(recommendations).hasSize(2);
+        assertThat(recommendations.get(0).type()).isEqualTo("knowledge");
+        assertThat(recommendations.get(0).title()).isEqualTo("晚餐如何吃得更均衡");
+        assertThat(recommendations.get(1).type()).isEqualTo("recipe");
+        assertThat(recommendations.get(1).title()).isEqualTo("山药香菇鸡肉粥");
         verify(consultationService).getPatientConsultation(12L, 7L);
     }
 

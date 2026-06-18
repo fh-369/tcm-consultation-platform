@@ -68,6 +68,10 @@ export async function askAIStream({ question, context = [], consultationId = nul
   }
 }
 
+export async function getAIRecommendations(question) {
+  return unwrapResult(await request.post('/patient/ai/recommendations', { question }))
+}
+
 export async function getDashboardSummary() {
   const summary = unwrapResult(await request.get('/admin/dashboard'))
   return {

@@ -3,6 +3,7 @@ package com.tcm.platform.controller;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcm.platform.config.SecurityConfig;
 import com.tcm.platform.dto.AIAnswerResponse;
+import com.tcm.platform.dto.AIContentRecommendation;
 import com.tcm.platform.dto.DashboardSummary;
 import com.tcm.platform.dto.LoginResponse;
 import com.tcm.platform.entity.Consultation;
@@ -247,6 +248,26 @@ class ApiSystemTest {
         mockMvc.perform(asyncDispatch(mvcResult))
                 .andExpect(status().isOk())
                 .andExpect(content().string("建议先清淡饮食。"));
+    }
+
+    @Test
+    @WithMockUser(username = "patient1", roles = "PATIENT")
+    void patientCanLoadAIContentRecommendations() throws Exception {
+        when(aiService.findRecommendations("胃口不好怎么调养？")).thenReturn(List.of(
+                new AIContentRecommendation(6L, "knowledge", "一餐如何吃得更均衡", "从食物种类开始调整。"),
+                new AIContentRecommendation(9L, "recipe", "山药香菇鸡肉粥", "适合作为清淡日常一餐。")
+        ));
+
+        mockMvc.perform(post("/api/patient/ai/recommendations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"question":"胃口不好怎么调养？"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].type").value("knowledge"))
+                .andExpect(jsonPath("$.data[0].title").value("一餐如何吃得更均衡"))
+                .andExpect(jsonPath("$.data[1].type").value("recipe"))
+                .andExpect(jsonPath("$.data[1].id").value(9));
     }
 
     @Test
