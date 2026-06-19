@@ -6,6 +6,8 @@ import com.tcm.platform.dto.AIAnswerResponse;
 import com.tcm.platform.dto.AIContentRecommendation;
 import com.tcm.platform.dto.DashboardSummary;
 import com.tcm.platform.dto.LoginResponse;
+import com.tcm.platform.dto.PersonnelRecord;
+import com.tcm.platform.entity.Account;
 import com.tcm.platform.entity.Consultation;
 import com.tcm.platform.entity.KnowledgeArticle;
 import com.tcm.platform.entity.PatientAccount;
@@ -25,6 +27,7 @@ import com.tcm.platform.service.ConsultationExportService;
 import com.tcm.platform.service.ConsultationService;
 import com.tcm.platform.service.DashboardService;
 import com.tcm.platform.service.KnowledgeArticleService;
+import com.tcm.platform.service.PersonnelService;
 import com.tcm.platform.service.RecipeService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -63,6 +66,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         AdminController.class,
         RecipeAdminController.class,
         DashboardController.class,
+        PersonnelController.class,
         AIController.class
 })
 @Import(SecurityConfig.class)
@@ -94,6 +98,9 @@ class ApiSystemTest {
 
     @MockBean
     private AIService aiService;
+
+    @MockBean
+    private PersonnelService personnelService;
 
     @MockBean
     private AccountMapper accountMapper;
@@ -337,6 +344,16 @@ class ApiSystemTest {
     }
 
     @Test
+    @WithMockUser(username = "doctor1", roles = "DOCTOR")
+    void doctorCannotAccessPersonnelManagementEndpoints() throws Exception {
+        mockMvc.perform(get("/api/admin/personnel/users"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/admin/personnel/doctors"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
     void adminCanUseDashboardContentManagementAndCsvExport() throws Exception {
         User admin = new User();
@@ -378,6 +395,45 @@ class ApiSystemTest {
                 .andExpect(header().string("Content-Disposition", "attachment; filename=\"consultations.csv\""))
                 .andExpect(content().contentType("text/csv;charset=UTF-8"))
                 .andExpect(content().bytes("\uFEFF问诊ID,患者姓名\n".getBytes(StandardCharsets.UTF_8)));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void adminCanListPersonnelAndUpdateAccountStatus() throws Exception {
+        PersonnelRecord patient = new PersonnelRecord();
+        patient.setId(8L);
+        patient.setUsername("patient1");
+        patient.setDisplayName("小林");
+        patient.setRole("patient");
+        patient.setEnabled(true);
+        Page<PersonnelRecord> page = new Page<>(1, 10);
+        page.setRecords(List.of(patient));
+        page.setTotal(1);
+        Account account = new Account();
+        account.setId(8L);
+        account.setUsername("patient1");
+        account.setEnabled(false);
+        when(personnelService.listPatients(1, 10, "小林")).thenReturn(page);
+        when(personnelService.updateEnabled(8L, false, "admin")).thenReturn(account);
+
+        mockMvc.perform(get("/api/admin/personnel/users")
+                        .param("current", "1")
+                        .param("size", "10")
+                        .param("keyword", "小林"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[0].displayName").value("小林"))
+                .andExpect(jsonPath("$.data.records[0].enabled").value(true));
+
+        mockMvc.perform(put("/api/admin/personnel/accounts/8/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"enabled":false}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(8))
+                .andExpect(jsonPath("$.data.enabled").value(false));
+
+        verify(personnelService).updateEnabled(8L, false, "admin");
     }
 
     @Test

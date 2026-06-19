@@ -58,6 +58,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/patient/recipe/**").permitAll()
                         .requestMatchers("/api/patient/knowledge/**").permitAll()
                         .requestMatchers("/api/patient/**").hasAnyRole("PATIENT", "DOCTOR", "ADMIN")
+                        .requestMatchers("/api/admin/personnel/**").hasRole("ADMIN")
                         .requestMatchers("/api/admin/**").hasAnyRole("DOCTOR", "ADMIN")
                         .requestMatchers("/uploads/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()

@@ -78,7 +78,13 @@ public class AuthService {
 
     public LoginResponse login(LoginRequest request) {
         Account account = findAccountByUsername(request.getUsername());
-        if (account == null || !passwordEncoder.matches(request.getPassword(), account.getPasswordHash())) {
+        if (account == null) {
+            throw new IllegalArgumentException("用户名或密码错误");
+        }
+        if (Boolean.FALSE.equals(account.getEnabled())) {
+            throw new IllegalArgumentException("账号已停用，请联系管理员");
+        }
+        if (!passwordEncoder.matches(request.getPassword(), account.getPasswordHash())) {
             throw new IllegalArgumentException("用户名或密码错误");
         }
 

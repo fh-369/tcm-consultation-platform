@@ -15,6 +15,7 @@ CREATE TABLE accounts (
     username VARCHAR(50) NOT NULL UNIQUE COMMENT '全局唯一用户名',
     password_hash VARCHAR(255) NOT NULL COMMENT '密码哈希(BCrypt)',
     role ENUM('patient', 'doctor', 'admin') NOT NULL COMMENT '账号角色',
+    enabled TINYINT(1) NOT NULL DEFAULT 1 COMMENT '账号是否启用',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     INDEX idx_account_role (role)

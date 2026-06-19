@@ -129,20 +129,20 @@ const router = createRouter({
         {
           path: 'users',
           name: 'admin-users',
-          component: () => import('../views/admin/AdminPlaceholderView.vue'),
+          component: () => import('../views/admin/PersonnelManagementView.vue'),
+          props: { resource: 'users' },
           meta: {
             title: '用户管理',
-            description: '患者账号、注册时间与账号状态将在人员管理阶段接入。',
             roles: ['admin'],
           },
         },
         {
           path: 'doctors',
           name: 'admin-doctors',
-          component: () => import('../views/admin/AdminPlaceholderView.vue'),
+          component: () => import('../views/admin/PersonnelManagementView.vue'),
+          props: { resource: 'doctors' },
           meta: {
             title: '医生管理',
-            description: '医生账号、科室、接诊状态与工作量将在人员管理阶段接入。',
             roles: ['admin'],
           },
         },

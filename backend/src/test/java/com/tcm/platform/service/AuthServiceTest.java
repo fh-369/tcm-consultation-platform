@@ -137,6 +137,20 @@ class AuthServiceTest {
         assertThat(response.getDisplayName()).isEqualTo("系统管理员");
     }
 
+    @Test
+    void loginRejectsDisabledAccount() {
+        Account account = account(5L, "patient1", "encoded-password", "patient");
+        account.setEnabled(false);
+        when(accountMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(account);
+
+        assertThatThrownBy(() -> service().login(loginRequest("patient1", "patient123")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("账号已停用，请联系管理员");
+
+        verify(passwordEncoder, never()).matches(any(), any());
+        verify(jwtUtil, never()).generateToken(any(), any(), any());
+    }
+
     private AuthService service() {
         return new AuthService(accountMapper, patientAccountMapper, userMapper, passwordEncoder, jwtUtil);
     }
@@ -172,6 +186,7 @@ class AuthServiceTest {
         account.setUsername(username);
         account.setPasswordHash(passwordHash);
         account.setRole(role);
+        account.setEnabled(true);
         return account;
     }
 }
