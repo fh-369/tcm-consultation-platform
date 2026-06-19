@@ -39,15 +39,15 @@ public class ConsultationService {
 
         Consultation consultation = new Consultation();
         consultation.setPatientAccountId(request.getPatientAccountId());
-        consultation.setPatientName(request.getPatientName());
+        consultation.setPatientName(request.getPatientName().trim());
         consultation.setAge(request.getAge());
         consultation.setGender(request.getGender());
-        consultation.setPhone(request.getPhone());
-        consultation.setSymptoms(request.getSymptoms());
-        consultation.setDuration(request.getDuration());
-        consultation.setAllergyHistory(request.getAllergyHistory());
+        consultation.setPhone(request.getPhone().trim());
+        consultation.setSymptoms(request.getSymptoms().trim());
+        consultation.setDuration(request.getDuration().trim());
+        consultation.setAllergyHistory(nullIfBlank(request.getAllergyHistory()));
         consultation.setUrgency(urgency);
-        consultation.setPatientNote(request.getPatientNote());
+        consultation.setPatientNote(nullIfBlank(request.getPatientNote()));
         consultation.setStatus(INITIAL_STATUS);
         reminderService.applyReminder(consultation);
 
@@ -90,6 +90,17 @@ public class ConsultationService {
         Consultation consultation = consultationMapper.selectById(id);
         if (consultation == null) {
             throw new IllegalArgumentException("问诊单不存在");
+        }
+        return consultation;
+    }
+
+    public Consultation getPatientConsultation(Long id, Long patientAccountId) {
+        if (patientAccountId == null) {
+            throw new IllegalArgumentException("患者账号 ID 不能为空");
+        }
+        Consultation consultation = getConsultationById(id);
+        if (!patientAccountId.equals(consultation.getPatientAccountId())) {
+            throw new IllegalArgumentException("问诊单不存在或无权访问");
         }
         return consultation;
     }
@@ -163,5 +174,9 @@ public class ConsultationService {
 
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private String nullIfBlank(String value) {
+        return hasText(value) ? value.trim() : null;
     }
 }

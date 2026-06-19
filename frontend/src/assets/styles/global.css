@@ -48,10 +48,20 @@ a,
 }
 
 button:focus-visible,
-a:focus-visible,
-[tabindex]:focus-visible {
+a:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--color-focus) 48%, transparent);
   outline-offset: 4px;
+}
+
+input:focus,
+textarea:focus,
+select:focus,
+.el-input__inner:focus,
+.el-textarea__inner:focus,
+.el-select__wrapper:focus,
+.el-select__wrapper.is-focused,
+.el-input__wrapper:focus-visible {
+  outline: none;
 }
 
 .page-container {

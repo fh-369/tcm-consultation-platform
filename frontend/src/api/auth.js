@@ -14,6 +14,10 @@ export async function loginPatient(credentials) {
   return unwrapResult(await request.post('/auth/login/patient', credentials))
 }
 
+export async function login(credentials) {
+  return unwrapResult(await request.post('/auth/login', credentials))
+}
+
 export async function loginAdmin(credentials) {
   return unwrapResult(await request.post('/auth/login/admin', credentials))
 }

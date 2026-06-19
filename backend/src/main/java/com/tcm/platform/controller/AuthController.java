@@ -29,6 +29,11 @@ public class AuthController {
         return Result.success("注册成功", authService.registerPatient(request));
     }
 
+    @PostMapping("/login")
+    public Result<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
+        return Result.success(authService.login(request));
+    }
+
     @PostMapping("/login/patient")
     public Result<LoginResponse> loginPatient(@Valid @RequestBody LoginRequest request) {
         return Result.success(authService.loginPatient(request));

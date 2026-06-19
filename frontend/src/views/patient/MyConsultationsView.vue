@@ -1,6 +1,7 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Bell, ChatLineRound, Plus, User } from '@element-plus/icons-vue'
 
 import { getMyConsultations } from '../../api/consultation'
 import {
@@ -52,16 +53,8 @@ onMounted(loadConsultations)
 
 <template>
   <section class="records-page page-container">
-    <header class="records-heading">
-      <div>
-        <p>持续跟进身体变化</p>
-        <h1>我的问诊</h1>
-        <span>查看问诊状态、提醒信息与医生备注。</span>
-      </div>
-      <RouterLink class="primary-link" to="/consultation/new">建立新问诊单</RouterLink>
-    </header>
-
     <section class="filters" aria-label="问诊记录筛选">
+      <h1>我的问诊</h1>
       <el-select v-model="filters.status" clearable placeholder="全部状态" @change="applyFilters">
         <el-option label="待接诊" value="待接诊" />
         <el-option label="接诊中" value="接诊中" />
@@ -73,12 +66,16 @@ onMounted(loadConsultations)
         <el-option label="非常紧急" value="非常紧急" />
       </el-select>
       <span>共 {{ total }} 条问诊记录</span>
+      <RouterLink class="new-consultation-link" to="/consultation/new">
+        <el-icon><Plus /></el-icon>
+        新建问诊单
+      </RouterLink>
     </section>
 
     <div v-loading="loading" class="records">
       <article v-for="item in consultations" :key="item.id" class="record-card">
-        <header>
-          <div>
+        <header class="record-header">
+          <div class="record-tags">
             <span :class="['tag', `tag-${statusDisplay(item.status).tone}`]">
               {{ statusDisplay(item.status).label }}
             </span>
@@ -89,32 +86,51 @@ onMounted(loadConsultations)
           <time>{{ formatConsultationTime(item.createdAt) }}</time>
         </header>
 
-        <h2>{{ item.symptoms }}</h2>
-        <dl>
-          <div>
-            <dt>患者</dt>
-            <dd>{{ item.patientName }}</dd>
-          </div>
-          <div>
-            <dt>持续时间</dt>
-            <dd>{{ item.duration || '未填写' }}</dd>
-          </div>
-          <div>
-            <dt>提醒</dt>
-            <dd :class="`text-${reminderDisplay(item.reminderLevel).tone}`">
-              {{ reminderDisplay(item.reminderLevel).label }}
-            </dd>
-          </div>
-        </dl>
+        <section class="symptom-summary">
+          <span>主要症状</span>
+          <h2>{{ item.symptoms }}</h2>
+        </section>
 
-        <section v-if="item.reminderText" class="note reminder-note">
-          <strong>系统提醒</strong>
-          <p>{{ item.reminderText }}</p>
-        </section>
-        <section v-if="item.doctorNote" class="note doctor-note">
-          <strong>医生备注</strong>
-          <p>{{ item.doctorNote }}</p>
-        </section>
+        <div class="record-details">
+          <section class="detail-card patient-detail">
+            <header>
+              <el-icon><User /></el-icon>
+              <h3>患者信息</h3>
+            </header>
+            <dl>
+              <div>
+                <dt>患者</dt>
+                <dd>{{ item.patientName }}</dd>
+              </div>
+              <div>
+                <dt>年龄 / 性别</dt>
+                <dd>{{ item.age || '未填写' }} / {{ item.gender || '未填写' }}</dd>
+              </div>
+              <div>
+                <dt>持续时间</dt>
+                <dd>{{ item.duration || '未填写' }}</dd>
+              </div>
+            </dl>
+            <p :class="['reminder-level', `text-${reminderDisplay(item.reminderLevel).tone}`]">
+              {{ reminderDisplay(item.reminderLevel).label }}
+            </p>
+          </section>
+
+          <section class="detail-card feedback-detail">
+            <header>
+              <el-icon><ChatLineRound /></el-icon>
+              <h3>问诊反馈</h3>
+            </header>
+            <div class="feedback-block system-feedback">
+              <strong><el-icon><Bell /></el-icon>系统提醒</strong>
+              <p>{{ item.reminderText || '暂无系统提醒' }}</p>
+            </div>
+            <div :class="['feedback-block', 'doctor-feedback', { 'has-reply': item.doctorNote }]">
+              <strong>医生回复</strong>
+              <p>{{ item.doctorNote || '医生暂未回复，请耐心等待。' }}</p>
+            </div>
+          </section>
+        </div>
       </article>
 
       <el-empty
@@ -139,34 +155,27 @@ onMounted(loadConsultations)
 
 <style scoped>
 .records-page {
-  padding-top: 42px;
+  padding-top: 24px;
+  padding-bottom: 40px;
 }
 
-.records-heading,
 .filters,
-.record-card header {
+.record-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 18px;
 }
 
-.records-heading p {
-  margin: 0;
-  color: var(--color-cinnabar);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.16em;
-}
-
-.records-heading h1 {
-  margin: 10px 0;
+.filters h1 {
+  flex: 0 0 auto;
+  margin: 0 12px 0 0;
   color: var(--color-ink);
-  font-size: clamp(2.2rem, 5vw, 3.8rem);
-  letter-spacing: -0.06em;
+  font-family: "Noto Serif SC", "STSong", serif;
+  font-size: 24px;
+  letter-spacing: 0.035em;
 }
 
-.records-heading span,
 .filters > span,
 .record-card time {
   color: var(--color-text-muted);
@@ -175,19 +184,57 @@ onMounted(loadConsultations)
 
 .filters {
   justify-content: start;
-  margin-top: 30px;
-  padding: 16px;
+  min-height: 72px;
+  padding: 12px 14px 12px 20px;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: rgb(255 255 255 / 75%);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 100% 0%, rgb(255 255 255 / 88%), transparent 32%),
+    rgb(247 251 248 / 82%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 86%),
+    0 12px 32px rgb(23 60 45 / 6%);
+  backdrop-filter: blur(16px);
 }
 
 .filters .el-select {
-  width: 180px;
+  width: 170px;
+}
+
+.filters :deep(.el-select__wrapper) {
+  min-height: 42px;
+  border: 1px solid rgb(67 126 97 / 13%);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 72%);
+  box-shadow: inset 0 1px 2px rgb(30 80 57 / 3%);
 }
 
 .filters > span {
   margin-left: auto;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.new-consultation-link {
+  display: inline-flex;
+  min-height: 44px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 7px;
+  padding: 0 17px;
+  border: 1px solid rgb(255 255 255 / 40%);
+  border-radius: 999px;
+  background: var(--color-ink);
+  box-shadow: 0 10px 24px rgb(17 66 47 / 18%);
+  color: white;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.new-consultation-link:hover {
+  background: #236e50;
+  box-shadow: 0 13px 28px rgb(17 66 47 / 23%);
+  transform: translateY(-1px);
 }
 
 .records {
@@ -199,25 +246,27 @@ onMounted(loadConsultations)
 }
 
 .record-card {
-  padding: 24px;
+  padding: 22px;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: white;
-  box-shadow: var(--shadow-card);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 100% 0%, rgb(235 246 239 / 70%), transparent 30%),
+    white;
+  box-shadow: 0 14px 38px rgb(23 60 45 / 8%);
 }
 
-.record-card header > div {
+.record-tags {
   display: flex;
-  gap: 6px;
+  gap: 8px;
 }
 
 .tag {
   display: inline-flex;
-  padding: 5px 8px;
-  border-radius: 5px;
+  padding: 6px 10px;
+  border-radius: 999px;
   background: var(--color-jade-light);
   color: var(--color-ink);
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 800;
 }
 
@@ -237,29 +286,112 @@ onMounted(loadConsultations)
   color: var(--color-text-muted);
 }
 
-.record-card h2 {
-  margin: 18px 0;
+.record-header time {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.symptom-summary {
+  margin-top: 18px;
+  padding: 17px 18px;
+  border: 1px solid rgb(65 126 96 / 12%);
+  border-radius: 16px;
+  background:
+    linear-gradient(145deg, rgb(244 250 246 / 92%), rgb(235 245 239 / 76%));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 86%);
+}
+
+.symptom-summary span {
+  color: var(--color-jade);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.symptom-summary h2 {
+  display: -webkit-box;
+  margin: 7px 0 0;
+  overflow: hidden;
   color: var(--color-ink);
-  font-size: 18px;
-  line-height: 1.6;
+  font-family: "Noto Serif SC", "STSong", serif;
+  font-size: 23px;
+  letter-spacing: 0.02em;
+  line-height: 1.55;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.record-details {
+  display: grid;
+  grid-template-columns: minmax(0, 0.88fr) minmax(0, 1.12fr);
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.detail-card {
+  padding: 16px;
+  border: 1px solid rgb(65 126 96 / 11%);
+  border-radius: 16px;
+  background: rgb(248 251 249 / 86%);
+}
+
+.detail-card > header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-ink);
+}
+
+.detail-card > header .el-icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--color-jade-light);
+  font-size: 16px;
+}
+
+.detail-card h3 {
+  margin: 0;
+  font-size: 17px;
+  letter-spacing: 0.03em;
+}
+
+.patient-detail {
+  text-align: center;
+}
+
+.patient-detail > header {
+  justify-content: center;
 }
 
 dl {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin: 0;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  margin: 16px 0 0;
+}
+
+.patient-detail dl > div {
+  padding: 11px 12px;
+  border: 1px solid rgb(65 126 96 / 10%);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 72%);
 }
 
 dt {
-  color: var(--color-text-muted);
-  font-size: 10px;
+  color: #557065;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 dd {
-  margin: 5px 0 0;
-  font-size: 12px;
-  font-weight: 700;
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+  color: #153f31;
+  font-size: 14px;
+  font-weight: 800;
 }
 
 .text-attention,
@@ -267,27 +399,51 @@ dd {
   color: var(--color-cinnabar);
 }
 
-.note {
-  margin-top: 18px;
-  padding: 12px 14px;
+.reminder-level {
+  display: inline-flex;
+  margin: 16px 0 0;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--color-jade-light);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.feedback-block {
+  margin-top: 12px;
+  padding: 12px 13px;
   border-left: 3px solid var(--color-jade);
-  background: var(--color-mist);
+  border-radius: 0 12px 12px 0;
+  background: white;
 }
 
-.doctor-note {
+.feedback-block strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--color-ink);
+  font-size: 15px;
+}
+
+.feedback-block p {
+  margin: 7px 0 0;
+  color: #466157;
+  font-size: 15px;
+  line-height: 1.75;
+}
+
+.doctor-feedback {
+  border-color: rgb(99 118 108 / 30%);
+  background: rgb(244 247 245 / 78%);
+}
+
+.doctor-feedback.has-reply {
   border-color: var(--color-cinnabar);
-  background: #fff8f6;
+  background: #fff7f4;
 }
 
-.note strong {
-  font-size: 11px;
-}
-
-.note p {
-  margin: 6px 0 0;
-  color: var(--color-text-muted);
-  font-size: 12px;
-  line-height: 1.7;
+.doctor-feedback.has-reply strong {
+  color: var(--color-cinnabar);
 }
 
 .el-pagination {
@@ -299,13 +455,20 @@ dd {
   .records {
     grid-template-columns: 1fr;
   }
+
+  .record-details {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 620px) {
-  .records-heading,
   .filters {
     display: grid;
     justify-content: stretch;
+  }
+
+  .filters h1 {
+    margin-right: 0;
   }
 
   .filters .el-select {
@@ -316,6 +479,11 @@ dd {
     margin-left: 0;
   }
 
+  .new-consultation-link {
+    justify-content: center;
+  }
+
+  .record-details,
   dl {
     grid-template-columns: 1fr;
   }

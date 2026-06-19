@@ -73,8 +73,18 @@ public class PatientController {
     }
 
     @GetMapping("/knowledge")
-    public Result<List<KnowledgeArticle>> listPublishedKnowledge() {
-        return Result.success(knowledgeArticleService.listPublishedArticles());
+    public Result<Page<KnowledgeArticle>> listPublishedKnowledge(
+            @RequestParam(defaultValue = "1") long current,
+            @RequestParam(defaultValue = "6") long size,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String keyword
+    ) {
+        return Result.success(knowledgeArticleService.listPublishedArticles(current, size, category, keyword));
+    }
+
+    @GetMapping("/knowledge/categories")
+    public Result<List<String>> listPublishedKnowledgeCategories() {
+        return Result.success(knowledgeArticleService.listPublishedCategories());
     }
 
     @GetMapping("/knowledge/{id}")

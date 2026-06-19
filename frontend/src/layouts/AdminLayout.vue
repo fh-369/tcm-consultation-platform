@@ -16,7 +16,7 @@ const navigation = [
 
 async function logout() {
   auth.logout()
-  await router.replace('/login/admin')
+  await router.replace('/login')
 }
 </script>
 
@@ -24,9 +24,9 @@ async function logout() {
   <div class="admin-shell">
     <aside class="admin-sidebar">
       <RouterLink class="admin-brand" to="/admin">
-        <span class="admin-brand-mark">岐</span>
+        <img class="admin-brand-mark" src="../assets/brand/logo-mark.png" alt="" />
         <span>
-          <strong>岐黄后台</strong>
+          <strong>知身问养</strong>
           <small>诊疗工作空间</small>
         </span>
       </RouterLink>
@@ -37,7 +37,7 @@ async function logout() {
         </RouterLink>
       </nav>
 
-      <RouterLink class="back-home" to="/">返回患者端首页</RouterLink>
+      <RouterLink class="back-home" to="/">返回平台首页</RouterLink>
     </aside>
 
     <div class="admin-content">
@@ -88,14 +88,9 @@ async function logout() {
 }
 
 .admin-brand-mark {
-  display: grid;
   width: 36px;
   height: 36px;
-  place-items: center;
-  border: 1px solid rgb(255 255 255 / 24%);
-  border-radius: 50%;
-  background: var(--color-ink-soft);
-  font-weight: 800;
+  object-fit: contain;
 }
 
 .admin-brand strong,
