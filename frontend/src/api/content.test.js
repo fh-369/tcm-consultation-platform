@@ -174,4 +174,21 @@ describe('content and AI API', () => {
     expect(result.urgencyDistribution).toEqual([{ label: '普通', value: 3 }])
     expect(result.trendLast6Months).toEqual([{ label: '2026-06', value: 4 }])
   })
+
+  it('loads a dashboard trend without reloading the other dashboard data', async () => {
+    request.get.mockResolvedValue({
+      data: {
+        code: 200,
+        data: [{ period: '2026-06-16', count: 5 }],
+      },
+    })
+    const { getDashboardTrend } = await import('./content')
+
+    const result = await getDashboardTrend('week')
+
+    expect(request.get).toHaveBeenCalledWith('/admin/dashboard/trend', {
+      params: { period: 'week' },
+    })
+    expect(result).toEqual([{ label: '2026-06-16', value: 5 }])
+  })
 })

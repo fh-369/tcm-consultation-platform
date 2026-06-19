@@ -348,6 +348,9 @@ class ApiSystemTest {
                 List.of(Map.of("urgency", "普通", "count", 2)),
                 List.of(Map.of("month", "2026-06", "count", 2))
         ));
+        when(dashboardService.getTrend("week")).thenReturn(
+                List.of(Map.of("period", "2026-06-16", "count", 2))
+        );
         when(knowledgeArticleService.listArticles(anyLong(), anyLong(), any(), any(), any()))
                 .thenReturn(new Page<>());
         when(recipeService.listRecipes(anyLong(), anyLong(), any(), any(), any(), any()))
@@ -358,6 +361,11 @@ class ApiSystemTest {
         mockMvc.perform(get("/api/admin/dashboard"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.statusDistribution[0].status").value("待接诊"));
+
+        mockMvc.perform(get("/api/admin/dashboard/trend").param("period", "week"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].period").value("2026-06-16"))
+                .andExpect(jsonPath("$.data[0].count").value(2));
 
         mockMvc.perform(get("/api/admin/knowledge"))
                 .andExpect(status().isOk());

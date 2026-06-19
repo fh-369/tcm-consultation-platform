@@ -81,6 +81,13 @@ export async function getDashboardSummary() {
   }
 }
 
+export async function getDashboardTrend(period = 'month') {
+  const trend = unwrapResult(await request.get('/admin/dashboard/trend', {
+    params: { period },
+  }))
+  return normalizeDistribution(trend, 'period')
+}
+
 function normalizeDistribution(items = [], labelKey) {
   return items.map((item) => ({ label: item[labelKey], value: Number(item.count || 0) }))
 }

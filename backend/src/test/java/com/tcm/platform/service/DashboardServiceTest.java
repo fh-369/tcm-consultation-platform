@@ -9,6 +9,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class DashboardServiceTest {
@@ -28,5 +29,25 @@ class DashboardServiceTest {
         assertThat(summary.statusDistribution()).isEqualTo(status);
         assertThat(summary.urgencyDistribution()).isEqualTo(urgency);
         assertThat(summary.trendLast6Months()).isEqualTo(trend);
+    }
+
+    @Test
+    void getTrendUsesTheRequestedTimeAggregation() {
+        ConsultationMapper consultationMapper = mock(ConsultationMapper.class);
+        List<Map<String, Object>> daily = List.of(Map.of("period", "2026-06-19", "count", 2L));
+        List<Map<String, Object>> weekly = List.of(Map.of("period", "2026-06-16", "count", 5L));
+        List<Map<String, Object>> monthly = List.of(Map.of("period", "2026-06", "count", 11L));
+        when(consultationMapper.trendLast7Days()).thenReturn(daily);
+        when(consultationMapper.trendLast4Weeks()).thenReturn(weekly);
+        when(consultationMapper.trendLast6MonthsByPeriod()).thenReturn(monthly);
+        DashboardService service = new DashboardService(consultationMapper);
+
+        assertThat(service.getTrend("day")).isEqualTo(daily);
+        assertThat(service.getTrend("week")).isEqualTo(weekly);
+        assertThat(service.getTrend("month")).isEqualTo(monthly);
+
+        verify(consultationMapper).trendLast7Days();
+        verify(consultationMapper).trendLast4Weeks();
+        verify(consultationMapper).trendLast6MonthsByPeriod();
     }
 }

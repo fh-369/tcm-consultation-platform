@@ -6,9 +6,9 @@ const route = useRoute()
 
 <template>
   <section class="admin-placeholder">
-    <p>Frontend Phase 1</p>
+    <p>后台能力建设</p>
     <h1>{{ route.meta.title }}</h1>
-    <span>当前页面仅用于验证后台双布局与导航，真实管理功能将在对应阶段实现。</span>
+    <span>{{ route.meta.description || '该模块将在后续小阶段接入真实管理功能。' }}</span>
   </section>
 </template>
 

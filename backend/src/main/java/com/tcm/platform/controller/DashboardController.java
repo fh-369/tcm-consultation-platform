@@ -9,7 +9,11 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+import java.util.Map;
 
 /**
  * 后台 Dashboard 统计与问诊导出接口。
@@ -34,6 +38,13 @@ public class DashboardController {
     @GetMapping("/dashboard")
     public Result<DashboardSummary> getDashboard() {
         return Result.success(dashboardService.getSummary());
+    }
+
+    @GetMapping("/dashboard/trend")
+    public Result<List<Map<String, Object>>> getDashboardTrend(
+            @RequestParam(defaultValue = "month") String period
+    ) {
+        return Result.success(dashboardService.getTrend(period));
     }
 
     @GetMapping("/export/consultations")

@@ -21,7 +21,29 @@ public interface ConsultationMapper extends BaseMapper<Consultation> {
     
     /** 近 6 个月问诊趋势 */
     @Select("SELECT DATE_FORMAT(created_at, '%Y-%m') AS month, COUNT(*) AS count " +
-            "FROM consultations WHERE created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH) " +
+            "FROM consultations " +
+            "WHERE created_at >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 5 MONTH), '%Y-%m-01') " +
             "GROUP BY month ORDER BY month")
     List<Map<String, Object>> trendLast6Months();
+
+    /** 近 7 天问诊趋势 */
+    @Select("SELECT DATE_FORMAT(created_at, '%Y-%m-%d') AS period, COUNT(*) AS count " +
+            "FROM consultations WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY) " +
+            "GROUP BY period ORDER BY period")
+    List<Map<String, Object>> trendLast7Days();
+
+    /** 近 4 周问诊趋势，以每周周一作为周期标识 */
+    @Select("SELECT DATE_FORMAT(DATE_SUB(DATE(created_at), INTERVAL WEEKDAY(created_at) DAY), '%Y-%m-%d') AS period, " +
+            "COUNT(*) AS count FROM consultations " +
+            "WHERE created_at >= DATE_SUB(" +
+            "DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY), INTERVAL 3 WEEK) " +
+            "GROUP BY period ORDER BY period")
+    List<Map<String, Object>> trendLast4Weeks();
+
+    /** 近 6 个月问诊趋势，统一使用 period 字段 */
+    @Select("SELECT DATE_FORMAT(created_at, '%Y-%m') AS period, COUNT(*) AS count " +
+            "FROM consultations " +
+            "WHERE created_at >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 5 MONTH), '%Y-%m-01') " +
+            "GROUP BY period ORDER BY period")
+    List<Map<String, Object>> trendLast6MonthsByPeriod();
 }
