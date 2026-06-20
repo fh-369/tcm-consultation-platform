@@ -17,3 +17,11 @@ export async function getAdminConsultations(params) {
 export async function updateAdminConsultation(id, payload) {
   return unwrapResult(await request.put(`/admin/consultation/${id}`, payload))
 }
+
+export async function assignAdminConsultation(id, doctorId) {
+  return unwrapResult(await request.put(`/admin/consultation/${id}/assignment`, { doctorId }))
+}
+
+export async function claimAdminConsultation(id) {
+  return unwrapResult(await request.put(`/admin/consultation/${id}/claim`))
+}

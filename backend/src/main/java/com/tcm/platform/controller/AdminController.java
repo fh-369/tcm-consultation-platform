@@ -3,12 +3,15 @@ package com.tcm.platform.controller;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcm.platform.common.Result;
+import com.tcm.platform.dto.ConsultationAssignmentRequest;
 import com.tcm.platform.dto.ConsultationUpdateRequest;
+import com.tcm.platform.dto.ConsultationWorkspaceRecord;
 import com.tcm.platform.entity.Consultation;
 import com.tcm.platform.entity.KnowledgeArticle;
 import com.tcm.platform.entity.User;
 import com.tcm.platform.mapper.UserMapper;
 import com.tcm.platform.service.ConsultationService;
+import com.tcm.platform.service.ConsultationWorkspaceService;
 import com.tcm.platform.service.KnowledgeArticleService;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.security.core.Authentication;
@@ -29,29 +32,45 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminController {
 
     private final ConsultationService consultationService;
+    private final ConsultationWorkspaceService consultationWorkspaceService;
     private final KnowledgeArticleService knowledgeArticleService;
     private final UserMapper userMapper;
 
     public AdminController(
             ConsultationService consultationService,
+            ConsultationWorkspaceService consultationWorkspaceService,
             KnowledgeArticleService knowledgeArticleService,
             UserMapper userMapper
     ) {
         this.consultationService = consultationService;
+        this.consultationWorkspaceService = consultationWorkspaceService;
         this.knowledgeArticleService = knowledgeArticleService;
         this.userMapper = userMapper;
     }
 
     @GetMapping("/consultation")
-    public Result<Page<Consultation>> listConsultations(
+    public Result<Page<ConsultationWorkspaceRecord>> listConsultations(
             @RequestParam(defaultValue = "1") long current,
             @RequestParam(defaultValue = "10") long size,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String urgency,
-            @RequestParam(required = false) String keyword
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long doctorId,
+            @RequestParam(required = false) Boolean unassigned,
+            Authentication authentication
     ) {
+        User user = currentUser(authentication);
+        if ("doctor".equals(user.getRole())) {
+            return Result.success(
+                    consultationWorkspaceService.listForDoctor(
+                            current, size, status, urgency, keyword, user.getId()
+                    )
+            );
+        }
         return Result.success(
-                consultationService.listConsultations(current, size, status, urgency, null, keyword)
+                consultationWorkspaceService.listForAdmin(
+                        current, size, status, urgency, keyword, doctorId, unassigned
+                )
         );
     }
 
@@ -61,8 +80,38 @@ public class AdminController {
             Authentication authentication,
             @RequestBody ConsultationUpdateRequest request
     ) {
-        request.setDoctorId(currentUser(authentication).getId());
+        User user = currentUser(authentication);
+        request.setDoctorId(null);
+        if ("doctor".equals(user.getRole())) {
+            return Result.success(
+                    "问诊更新成功",
+                    consultationWorkspaceService.updateAsDoctor(id, request, user.getId())
+            );
+        }
         return Result.success("问诊更新成功", consultationService.updateConsultation(id, request));
+    }
+
+    @PutMapping("/consultation/{id}/assignment")
+    public Result<Consultation> assignConsultation(
+            @PathVariable Long id,
+            @RequestBody ConsultationAssignmentRequest request
+    ) {
+        return Result.success(
+                request.getDoctorId() == null ? "已取消问诊分配" : "问诊分配成功",
+                consultationWorkspaceService.assign(id, request.getDoctorId())
+        );
+    }
+
+    @PutMapping("/consultation/{id}/claim")
+    public Result<Consultation> claimConsultation(
+            @PathVariable Long id,
+            Authentication authentication
+    ) {
+        User doctor = currentUser(authentication);
+        return Result.success(
+                "问诊认领成功",
+                consultationWorkspaceService.claim(id, doctor.getId())
+        );
     }
 
     @GetMapping("/knowledge")

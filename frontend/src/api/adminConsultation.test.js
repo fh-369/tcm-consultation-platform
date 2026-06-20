@@ -32,4 +32,18 @@ describe('admin consultation API', () => {
 
     expect(request.put).toHaveBeenCalledWith('/admin/consultation/9', payload)
   })
+
+  it('assigns and claims consultations through dedicated endpoints', async () => {
+    request.put.mockResolvedValue({ data: { code: 200, data: { id: 9, doctorId: 6 } } })
+    const { assignAdminConsultation, claimAdminConsultation } =
+      await import('./adminConsultation')
+
+    await assignAdminConsultation(9, 6)
+    await claimAdminConsultation(10)
+
+    expect(request.put).toHaveBeenCalledWith('/admin/consultation/9/assignment', {
+      doctorId: 6,
+    })
+    expect(request.put).toHaveBeenCalledWith('/admin/consultation/10/claim')
+  })
 })

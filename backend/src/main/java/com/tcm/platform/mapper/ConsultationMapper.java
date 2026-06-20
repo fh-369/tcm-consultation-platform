@@ -3,13 +3,42 @@ package com.tcm.platform.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.tcm.platform.entity.Consultation;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 import java.util.List;
 import java.util.Map;
 
 @Mapper
 public interface ConsultationMapper extends BaseMapper<Consultation> {
+
+    @Update("""
+            UPDATE consultations
+            SET doctor_id = #{doctorId},
+                status = #{status},
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = #{consultationId}
+            """)
+    int updateAssignment(
+            @Param("consultationId") Long consultationId,
+            @Param("doctorId") Long doctorId,
+            @Param("status") String status
+    );
+
+    @Update("""
+            UPDATE consultations
+            SET doctor_id = #{doctorId},
+                status = '待接诊',
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = #{consultationId}
+              AND doctor_id IS NULL
+              AND status <> '已完成'
+            """)
+    int claimIfUnassigned(
+            @Param("consultationId") Long consultationId,
+            @Param("doctorId") Long doctorId
+    );
 
     /** 按状态统计问诊数量 */
     @Select("SELECT status, COUNT(*) AS count FROM consultations GROUP BY status")

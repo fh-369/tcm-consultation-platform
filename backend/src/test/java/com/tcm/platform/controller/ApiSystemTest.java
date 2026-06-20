@@ -25,6 +25,7 @@ import com.tcm.platform.service.AIService;
 import com.tcm.platform.service.AuthService;
 import com.tcm.platform.service.ConsultationExportService;
 import com.tcm.platform.service.ConsultationService;
+import com.tcm.platform.service.ConsultationWorkspaceService;
 import com.tcm.platform.service.DashboardService;
 import com.tcm.platform.service.KnowledgeArticleService;
 import com.tcm.platform.service.PersonnelService;
@@ -83,6 +84,9 @@ class ApiSystemTest {
 
     @MockBean
     private ConsultationService consultationService;
+
+    @MockBean
+    private ConsultationWorkspaceService consultationWorkspaceService;
 
     @MockBean
     private KnowledgeArticleService knowledgeArticleService;
@@ -350,6 +354,56 @@ class ApiSystemTest {
                 .andExpect(status().isForbidden());
 
         mockMvc.perform(get("/api/admin/personnel/doctors"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "doctor1", roles = "DOCTOR")
+    void doctorCanLoadOwnWorkspaceAndClaimButCannotAssign() throws Exception {
+        User doctor = new User();
+        doctor.setId(6L);
+        doctor.setUsername("doctor1");
+        doctor.setRole("doctor");
+        when(userMapper.selectOne(any())).thenReturn(doctor);
+        when(consultationWorkspaceService.listForDoctor(1, 10, null, null, null, 6L))
+                .thenReturn(new Page<>());
+        Consultation claimed = new Consultation();
+        claimed.setId(9L);
+        claimed.setDoctorId(6L);
+        when(consultationWorkspaceService.claim(9L, 6L)).thenReturn(claimed);
+
+        mockMvc.perform(get("/api/admin/consultation"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(put("/api/admin/consultation/9/claim"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.doctorId").value(6));
+
+        mockMvc.perform(put("/api/admin/consultation/9/assignment")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"doctorId":7}
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void adminCanAssignButCannotClaimConsultations() throws Exception {
+        Consultation assigned = new Consultation();
+        assigned.setId(9L);
+        assigned.setDoctorId(6L);
+        when(consultationWorkspaceService.assign(9L, 6L)).thenReturn(assigned);
+
+        mockMvc.perform(put("/api/admin/consultation/9/assignment")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"doctorId":6}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.doctorId").value(6));
+
+        mockMvc.perform(put("/api/admin/consultation/9/claim"))
                 .andExpect(status().isForbidden());
     }
 
