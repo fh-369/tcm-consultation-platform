@@ -29,6 +29,9 @@ public class ConsultationWorkspaceService {
 
     private static final String PENDING_STATUS = "待接诊";
     private static final String COMPLETED_STATUS = "已完成";
+    private static final String APPROVED_STATUS = "APPROVED";
+    private static final String GENERAL_DEPARTMENT_CODE = "general";
+    private static final Set<String> VALID_POOL_SCOPES = Set.of("all", "department", "general");
     private static final Set<String> VALID_STATUSES = Set.of("待接诊", "接诊中", "已完成");
     private static final Set<String> VALID_URGENCIES = Set.of("普通", "紧急", "非常紧急");
 
@@ -66,7 +69,40 @@ public class ConsultationWorkspaceService {
         return loadRecords(current, size, query);
     }
 
-    public Page<ConsultationWorkspaceRecord> listForDoctor(
+    public Page<ConsultationWorkspaceRecord> listDepartmentPool(
+            long current,
+            long size,
+            String urgency,
+            String keyword,
+            String scope,
+            Long doctorId
+    ) {
+        User doctor = requireActiveDoctor(doctorId);
+        Department generalDepartment = requireGeneralDepartment();
+        String poolScope = hasText(scope) ? scope : "all";
+        if (!VALID_POOL_SCOPES.contains(poolScope)) {
+            throw new IllegalArgumentException("无效的问诊池范围");
+        }
+
+        LambdaQueryWrapper<Consultation> query =
+                baseQuery(current, size, PENDING_STATUS, urgency, keyword);
+        query.isNull(Consultation::getDoctorId);
+        if ("department".equals(poolScope)) {
+            query.eq(Consultation::getDepartmentId, doctor.getDepartmentId());
+        } else if ("general".equals(poolScope)) {
+            query.eq(Consultation::getDepartmentId, generalDepartment.getId());
+        } else if (Objects.equals(doctor.getDepartmentId(), generalDepartment.getId())) {
+            query.eq(Consultation::getDepartmentId, generalDepartment.getId());
+        } else {
+            query.and(wrapper -> wrapper
+                    .eq(Consultation::getDepartmentId, doctor.getDepartmentId())
+                    .or()
+                    .eq(Consultation::getDepartmentId, generalDepartment.getId()));
+        }
+        return loadRecords(current, size, query);
+    }
+
+    public Page<ConsultationWorkspaceRecord> listMine(
             long current,
             long size,
             String status,
@@ -74,11 +110,9 @@ public class ConsultationWorkspaceService {
             String keyword,
             Long doctorId
     ) {
+        requireActiveDoctor(doctorId);
         LambdaQueryWrapper<Consultation> query = baseQuery(current, size, status, urgency, keyword);
-        query.and(wrapper -> wrapper
-                .isNull(Consultation::getDoctorId)
-                .or()
-                .eq(Consultation::getDoctorId, doctorId));
+        query.eq(Consultation::getDoctorId, doctorId);
         return loadRecords(current, size, query);
     }
 
@@ -104,14 +138,24 @@ public class ConsultationWorkspaceService {
 
     @Transactional
     public Consultation claim(Long consultationId, Long doctorId) {
-        if (consultationMapper.claimIfUnassigned(consultationId, doctorId) == 1) {
-            return requireConsultation(consultationId);
-        }
-
+        User doctor = requireActiveDoctor(doctorId);
+        Department generalDepartment = requireGeneralDepartment();
         Consultation consultation = requireConsultation(consultationId);
         if (COMPLETED_STATUS.equals(consultation.getStatus())) {
             throw new IllegalArgumentException("已完成问诊不能认领");
         }
+        if (consultation.getDoctorId() != null) {
+            throw new IllegalArgumentException("该问诊单已被其他医生认领");
+        }
+        if (!Objects.equals(consultation.getDepartmentId(), doctor.getDepartmentId())
+                && !Objects.equals(consultation.getDepartmentId(), generalDepartment.getId())) {
+            throw new IllegalArgumentException("只能认领本科室或综合咨询问诊");
+        }
+
+        if (consultationMapper.claimIfUnassigned(consultationId, doctorId) == 1) {
+            return requireConsultation(consultationId);
+        }
+
         throw new IllegalArgumentException("该问诊单已被其他医生认领");
     }
 
@@ -245,6 +289,36 @@ public class ConsultationWorkspaceService {
         if (account == null || Boolean.FALSE.equals(account.getEnabled())) {
             throw new IllegalArgumentException("该医生账号已停用");
         }
+    }
+
+    private User requireActiveDoctor(Long doctorId) {
+        User doctor = userMapper.selectById(doctorId);
+        if (doctor == null || !"doctor".equals(doctor.getRole())) {
+            throw new IllegalArgumentException("当前账号不是有效医生");
+        }
+        if (!APPROVED_STATUS.equals(doctor.getApprovalStatus())) {
+            throw new IllegalArgumentException("医生账号尚未通过审核");
+        }
+        if (doctor.getDepartmentId() == null) {
+            throw new IllegalArgumentException("医生尚未配置所属科室");
+        }
+        Account account = accountMapper.selectById(doctor.getAccountId());
+        if (account == null || Boolean.FALSE.equals(account.getEnabled())) {
+            throw new IllegalArgumentException("医生账号已停用");
+        }
+        return doctor;
+    }
+
+    private Department requireGeneralDepartment() {
+        Department department = departmentMapper.selectOne(
+                new LambdaQueryWrapper<Department>()
+                        .eq(Department::getCode, GENERAL_DEPARTMENT_CODE)
+                        .eq(Department::getEnabled, true)
+        );
+        if (department == null) {
+            throw new IllegalStateException("综合咨询科室未配置");
+        }
+        return department;
     }
 
     private Department requireEnabledDepartment(Long departmentId) {

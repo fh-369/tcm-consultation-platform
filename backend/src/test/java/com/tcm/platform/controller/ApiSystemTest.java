@@ -66,6 +66,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         AuthController.class,
         PatientController.class,
         AdminController.class,
+        DoctorConsultationController.class,
         RecipeAdminController.class,
         DashboardController.class,
         PersonnelController.class,
@@ -364,25 +365,40 @@ class ApiSystemTest {
 
     @Test
     @WithMockUser(username = "doctor1", roles = "DOCTOR")
-    void doctorCanLoadOwnWorkspaceAndClaimButCannotAssign() throws Exception {
+    void doctorUsesDedicatedWorkspacesAndCannotEnterAdminScheduling() throws Exception {
         User doctor = new User();
         doctor.setId(6L);
         doctor.setUsername("doctor1");
         doctor.setRole("doctor");
+        doctor.setDepartmentId(2L);
         when(userMapper.selectOne(any())).thenReturn(doctor);
-        when(consultationWorkspaceService.listForDoctor(1, 10, null, null, null, 6L))
+        when(consultationWorkspaceService.listDepartmentPool(
+                1, 10, "紧急", "胃痛", "all", 6L
+        ))
+                .thenReturn(new Page<>());
+        when(consultationWorkspaceService.listMine(1, 10, "接诊中", null, null, 6L))
                 .thenReturn(new Page<>());
         Consultation claimed = new Consultation();
         claimed.setId(9L);
         claimed.setDoctorId(6L);
         when(consultationWorkspaceService.claim(9L, 6L)).thenReturn(claimed);
 
-        mockMvc.perform(get("/api/admin/consultation"))
+        mockMvc.perform(get("/api/doctor/consultations/pool")
+                        .param("urgency", "紧急")
+                        .param("keyword", "胃痛")
+                        .param("scope", "all"))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(put("/api/admin/consultation/9/claim"))
+        mockMvc.perform(get("/api/doctor/consultations/mine")
+                        .param("status", "接诊中"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(put("/api/doctor/consultations/9/claim"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.doctorId").value(6));
+
+        mockMvc.perform(get("/api/admin/consultation"))
+                .andExpect(status().isForbidden());
 
         mockMvc.perform(put("/api/admin/consultation/9/assignment")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -397,6 +413,11 @@ class ApiSystemTest {
                                 {"departmentId":3}
                                 """))
                 .andExpect(status().isForbidden());
+
+        verify(consultationWorkspaceService)
+                .listDepartmentPool(1, 10, "紧急", "胃痛", "all", 6L);
+        verify(consultationWorkspaceService)
+                .listMine(1, 10, "接诊中", null, null, 6L);
     }
 
     @Test

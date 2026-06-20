@@ -38,11 +38,24 @@ class ConsultationWorkspaceServiceTest {
     }
 
     @Test
-    void doctorWorkspaceOnlyIncludesUnassignedAndOwnConsultations() {
+    void departmentPoolOnlyIncludesPendingUnassignedConsultationsFromOwnOrGeneralDepartment() {
         ConsultationMapper consultationMapper = mock(ConsultationMapper.class);
         UserMapper userMapper = mock(UserMapper.class);
         AccountMapper accountMapper = mock(AccountMapper.class);
         DepartmentMapper departmentMapper = mock(DepartmentMapper.class);
+        User doctor = doctor(6L, 16L);
+        doctor.setDepartmentId(2L);
+        doctor.setApprovalStatus("APPROVED");
+        Account account = new Account();
+        account.setId(16L);
+        account.setEnabled(true);
+        Department general = new Department();
+        general.setId(1L);
+        general.setCode("general");
+        general.setEnabled(true);
+        when(userMapper.selectById(6L)).thenReturn(doctor);
+        when(accountMapper.selectById(16L)).thenReturn(account);
+        when(departmentMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(general);
         when(consultationMapper.selectPage(any(IPage.class), any(LambdaQueryWrapper.class)))
                 .thenReturn(new Page<>());
         ConsultationWorkspaceService service =
@@ -50,13 +63,42 @@ class ConsultationWorkspaceServiceTest {
                         consultationMapper, userMapper, accountMapper, departmentMapper
                 );
 
-        service.listForDoctor(1, 10, null, null, null, 6L);
+        service.listDepartmentPool(1, 10, null, null, "all", 6L);
 
         ArgumentCaptor<LambdaQueryWrapper<Consultation>> queryCaptor =
                 ArgumentCaptor.forClass(LambdaQueryWrapper.class);
         verify(consultationMapper).selectPage(any(IPage.class), queryCaptor.capture());
         assertThat(queryCaptor.getValue().getCustomSqlSegment())
-                .contains("doctor_id IS NULL", "doctor_id", "OR");
+                .contains("doctor_id IS NULL", "status", "department_id", "OR");
+    }
+
+    @Test
+    void myConsultationsOnlyIncludesRecordsAssignedToCurrentDoctor() {
+        ConsultationMapper consultationMapper = mock(ConsultationMapper.class);
+        UserMapper userMapper = mock(UserMapper.class);
+        AccountMapper accountMapper = mock(AccountMapper.class);
+        DepartmentMapper departmentMapper = mock(DepartmentMapper.class);
+        User doctor = doctor(6L, 16L);
+        Account account = new Account();
+        account.setId(16L);
+        account.setEnabled(true);
+        when(userMapper.selectById(6L)).thenReturn(doctor);
+        when(accountMapper.selectById(16L)).thenReturn(account);
+        when(consultationMapper.selectPage(any(IPage.class), any(LambdaQueryWrapper.class)))
+                .thenReturn(new Page<>());
+        ConsultationWorkspaceService service =
+                new ConsultationWorkspaceService(
+                        consultationMapper, userMapper, accountMapper, departmentMapper
+                );
+
+        service.listMine(1, 10, "接诊中", null, null, 6L);
+
+        ArgumentCaptor<LambdaQueryWrapper<Consultation>> queryCaptor =
+                ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        verify(consultationMapper).selectPage(any(IPage.class), queryCaptor.capture());
+        assertThat(queryCaptor.getValue().getCustomSqlSegment())
+                .contains("doctor_id", "status")
+                .doesNotContain("doctor_id IS NULL");
     }
 
     @Test
@@ -113,9 +155,23 @@ class ConsultationWorkspaceServiceTest {
         UserMapper userMapper = mock(UserMapper.class);
         AccountMapper accountMapper = mock(AccountMapper.class);
         DepartmentMapper departmentMapper = mock(DepartmentMapper.class);
+        Consultation unassignedRecord = consultation(9L, null, "待接诊");
+        unassignedRecord.setDepartmentId(2L);
         Consultation claimedRecord = consultation(9L, 6L, "待接诊");
+        claimedRecord.setDepartmentId(2L);
+        User doctor = doctor(6L, 16L);
+        Account account = new Account();
+        account.setId(16L);
+        account.setEnabled(true);
+        Department general = new Department();
+        general.setId(1L);
+        general.setCode("general");
+        general.setEnabled(true);
+        when(userMapper.selectById(6L)).thenReturn(doctor);
+        when(accountMapper.selectById(16L)).thenReturn(account);
+        when(departmentMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(general);
         when(consultationMapper.claimIfUnassigned(9L, 6L)).thenReturn(1);
-        when(consultationMapper.selectById(9L)).thenReturn(claimedRecord);
+        when(consultationMapper.selectById(9L)).thenReturn(unassignedRecord, claimedRecord);
         ConsultationWorkspaceService service =
                 new ConsultationWorkspaceService(
                         consultationMapper, userMapper, accountMapper, departmentMapper
@@ -138,12 +194,57 @@ class ConsultationWorkspaceServiceTest {
     }
 
     @Test
+    void doctorCannotClaimConsultationOutsideOwnOrGeneralDepartment() {
+        ConsultationMapper consultationMapper = mock(ConsultationMapper.class);
+        UserMapper userMapper = mock(UserMapper.class);
+        AccountMapper accountMapper = mock(AccountMapper.class);
+        DepartmentMapper departmentMapper = mock(DepartmentMapper.class);
+        User doctor = doctor(6L, 16L);
+        doctor.setDepartmentId(2L);
+        doctor.setApprovalStatus("APPROVED");
+        Account account = new Account();
+        account.setId(16L);
+        account.setEnabled(true);
+        Department general = new Department();
+        general.setId(1L);
+        general.setCode("general");
+        general.setEnabled(true);
+        Consultation otherDepartment = consultation(9L, null, "待接诊");
+        otherDepartment.setDepartmentId(3L);
+        when(userMapper.selectById(6L)).thenReturn(doctor);
+        when(accountMapper.selectById(16L)).thenReturn(account);
+        when(departmentMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(general);
+        when(consultationMapper.selectById(9L)).thenReturn(otherDepartment);
+        ConsultationWorkspaceService service =
+                new ConsultationWorkspaceService(
+                        consultationMapper, userMapper, accountMapper, departmentMapper
+                );
+
+        assertThatThrownBy(() -> service.claim(9L, 6L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("只能认领本科室或综合咨询问诊");
+
+        verify(consultationMapper, never()).claimIfUnassigned(any(), any());
+    }
+
+    @Test
     void completedConsultationCannotBeReassignedOrClaimed() {
         ConsultationMapper consultationMapper = mock(ConsultationMapper.class);
         UserMapper userMapper = mock(UserMapper.class);
         AccountMapper accountMapper = mock(AccountMapper.class);
         DepartmentMapper departmentMapper = mock(DepartmentMapper.class);
         Consultation completed = consultation(9L, 6L, "已完成");
+        User doctor = doctor(7L, 17L);
+        Account account = new Account();
+        account.setId(17L);
+        account.setEnabled(true);
+        Department general = new Department();
+        general.setId(1L);
+        general.setCode("general");
+        general.setEnabled(true);
+        when(userMapper.selectById(7L)).thenReturn(doctor);
+        when(accountMapper.selectById(17L)).thenReturn(account);
+        when(departmentMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(general);
         when(consultationMapper.claimIfUnassigned(9L, 7L)).thenReturn(0);
         when(consultationMapper.selectById(9L)).thenReturn(completed);
         ConsultationWorkspaceService service =
@@ -229,6 +330,9 @@ class ConsultationWorkspaceServiceTest {
         doctor.setAccountId(accountId);
         doctor.setRole("doctor");
         doctor.setDisplayName("张医生");
+        doctor.setDepartment("中医内科");
+        doctor.setDepartmentId(2L);
+        doctor.setApprovalStatus("APPROVED");
         return doctor;
     }
 }

@@ -59,17 +59,8 @@ public class AdminController {
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Long doctorId,
             @RequestParam(required = false) Boolean unassigned,
-            @RequestParam(required = false) Long departmentId,
-            Authentication authentication
+            @RequestParam(required = false) Long departmentId
     ) {
-        User user = currentUser(authentication);
-        if ("doctor".equals(user.getRole())) {
-            return Result.success(
-                    consultationWorkspaceService.listForDoctor(
-                            current, size, status, urgency, keyword, user.getId()
-                    )
-            );
-        }
         return Result.success(
                 consultationWorkspaceService.listForAdmin(
                         current, size, status, urgency, keyword, doctorId, unassigned, departmentId
@@ -80,17 +71,9 @@ public class AdminController {
     @PutMapping("/consultation/{id}")
     public Result<Consultation> updateConsultation(
             @PathVariable Long id,
-            Authentication authentication,
             @RequestBody ConsultationUpdateRequest request
     ) {
-        User user = currentUser(authentication);
         request.setDoctorId(null);
-        if ("doctor".equals(user.getRole())) {
-            return Result.success(
-                    "问诊更新成功",
-                    consultationWorkspaceService.updateAsDoctor(id, request, user.getId())
-            );
-        }
         return Result.success("问诊更新成功", consultationService.updateConsultation(id, request));
     }
 

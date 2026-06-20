@@ -33,7 +33,8 @@ const DOCTOR_NAVIGATION = [
     label: '我的工作',
     items: [
       { label: '医生工作台', to: '/admin', icon: '台' },
-      { label: '问诊工作区', to: '/admin/consultations', icon: '诊' },
+      { label: '科室问诊池', to: '/admin/department-pool', icon: '池' },
+      { label: '我的问诊', to: '/admin/my-consultations', icon: '诊' },
     ],
   },
   {

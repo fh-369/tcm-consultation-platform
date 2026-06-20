@@ -28,7 +28,9 @@ describe('admin workspace role configuration', () => {
     const destinations = navigation.flatMap((section) => section.items).map((item) => item.to)
 
     expect(navigation.map((section) => section.label)).toEqual(['我的工作', '参考内容'])
-    expect(destinations).toContain('/admin/consultations')
+    expect(destinations).toContain('/admin/department-pool')
+    expect(destinations).toContain('/admin/my-consultations')
+    expect(destinations).not.toContain('/admin/consultations')
     expect(destinations).toContain('/knowledge')
     expect(destinations).not.toContain('/admin/users')
     expect(destinations).not.toContain('/admin/export')

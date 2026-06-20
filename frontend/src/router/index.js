@@ -1,6 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
-import { canAccessRole, defaultRouteForRole } from './access'
+import {
+  canAccessRole,
+  consultationWorkspaceRouteForRole,
+  defaultRouteForRole,
+} from './access'
 import { pinia } from '../stores'
 import { useAuthStore } from '../stores/auth'
 
@@ -130,7 +134,19 @@ const router = createRouter({
           path: 'consultations',
           name: 'admin-consultations',
           component: () => import('../views/admin/ConsultationManagementView.vue'),
-          meta: { title: '问诊工作区', roles: ['doctor', 'admin'] },
+          meta: { title: '问诊调度', roles: ['admin'] },
+        },
+        {
+          path: 'department-pool',
+          name: 'doctor-department-pool',
+          component: () => import('../views/admin/DoctorDepartmentPoolView.vue'),
+          meta: { title: '科室问诊池', roles: ['doctor'] },
+        },
+        {
+          path: 'my-consultations',
+          name: 'doctor-my-consultations',
+          component: () => import('../views/admin/DoctorMyConsultationsView.vue'),
+          meta: { title: '我的问诊', roles: ['doctor'] },
         },
         {
           path: 'users',
@@ -191,6 +207,10 @@ router.beforeEach((to) => {
 
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     return { path: '/login', query: { redirect: to.fullPath } }
+  }
+
+  if (to.name === 'admin-consultations' && auth.role === 'doctor') {
+    return consultationWorkspaceRouteForRole(auth.role)
   }
 
   if (to.meta.roles && !canAccessRole(auth.role, to.meta.roles)) {

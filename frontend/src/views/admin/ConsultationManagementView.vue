@@ -1,13 +1,11 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { onMounted, reactive, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 
 import {
   assignAdminConsultation,
-  claimAdminConsultation,
   getAdminConsultations,
   updateAdminConsultationDepartment,
-  updateAdminConsultation,
 } from '../../api/adminConsultation'
 import { getDepartments } from '../../api/auth'
 import { getPersonnel } from '../../api/personnel'
@@ -18,11 +16,8 @@ import {
   statusDisplay,
   urgencyDisplay,
 } from '../../features/consultation/display'
-import { useAuthStore } from '../../stores/auth'
 
-const auth = useAuthStore()
 const loading = ref(false)
-const saving = ref(false)
 const assigning = ref(false)
 const drawerVisible = ref(false)
 const consultations = ref([])
@@ -30,7 +25,6 @@ const doctors = ref([])
 const departments = ref([])
 const selected = ref(null)
 const total = ref(0)
-const isAdmin = computed(() => auth.role === 'admin')
 const filters = reactive({
   current: 1,
   size: 10,
@@ -39,10 +33,6 @@ const filters = reactive({
   keyword: '',
   assignment: 'all',
   departmentId: '',
-})
-const updateForm = reactive({
-  status: '',
-  doctorNote: '',
 })
 const assignmentDoctorId = ref('')
 const consultationDepartmentId = ref('')
@@ -61,12 +51,12 @@ async function loadConsultations() {
       urgency: filters.urgency || undefined,
       keyword: filters.keyword || undefined,
     }
-    if (isAdmin.value && filters.assignment === 'unassigned') {
+    if (filters.assignment === 'unassigned') {
       params.unassigned = true
-    } else if (isAdmin.value && filters.assignment.startsWith('doctor:')) {
+    } else if (filters.assignment.startsWith('doctor:')) {
       params.doctorId = Number(filters.assignment.slice(7))
     }
-    if (isAdmin.value && filters.departmentId) {
+    if (filters.departmentId) {
       params.departmentId = Number(filters.departmentId)
     }
     const page = await getAdminConsultations(params)
@@ -80,7 +70,6 @@ async function loadConsultations() {
 }
 
 async function loadDoctors() {
-  if (!isAdmin.value) return
   try {
     const page = await getPersonnel('doctors', { current: 1, size: 100 })
     doctors.value = (page.records || []).filter((doctor) => doctor.enabled)
@@ -117,8 +106,6 @@ function resetFilters() {
 
 function openDetails(item) {
   selected.value = item
-  updateForm.status = item.status
-  updateForm.doctorNote = item.doctorNote || ''
   assignmentDoctorId.value = item.doctorId || ''
   consultationDepartmentId.value = item.departmentId || ''
   drawerVisible.value = true
@@ -164,48 +151,6 @@ async function saveAssignment() {
   }
 }
 
-async function claimConsultation(item) {
-  try {
-    await ElMessageBox.confirm(
-      `认领“${item.patientName}”的问诊后，其他医生将不能再认领该记录。`,
-      '确认认领问诊',
-      {
-        confirmButtonText: '确认认领',
-        cancelButtonText: '取消',
-        type: 'info',
-      },
-    )
-  } catch {
-    return
-  }
-
-  assigning.value = true
-  try {
-    await claimAdminConsultation(item.id)
-    ElMessage.success('问诊认领成功')
-    drawerVisible.value = false
-    await loadConsultations()
-  } catch (error) {
-    ElMessage.error(errorMessage(error, '问诊认领失败'))
-  } finally {
-    assigning.value = false
-  }
-}
-
-async function saveUpdate() {
-  saving.value = true
-  try {
-    const updated = await updateAdminConsultation(selected.value.id, updateForm)
-    selected.value = updated
-    ElMessage.success('问诊状态和医生备注已更新')
-    await loadConsultations()
-  } catch (error) {
-    ElMessage.error(errorMessage(error, '问诊更新失败'))
-  } finally {
-    saving.value = false
-  }
-}
-
 onMounted(async () => {
   await Promise.all([loadConsultations(), loadDoctors(), loadDepartments()])
 })
@@ -215,12 +160,8 @@ onMounted(async () => {
   <section class="management-page">
     <header class="management-heading">
       <div>
-        <h1>{{ isAdmin ? '问诊调度' : '问诊工作区' }}</h1>
-        <p>
-          {{ isAdmin
-            ? '查看平台全部问诊，为待处理记录安排负责医生。'
-            : '可认领尚未分配的问诊，并处理已经分配给自己的记录。' }}
-        </p>
+        <h1>问诊调度</h1>
+        <p>查看平台全部问诊，为待处理记录安排负责医生。</p>
       </div>
       <span>共 {{ total }} 张问诊单</span>
     </header>
@@ -243,7 +184,6 @@ onMounted(async () => {
         <el-option label="非常紧急" value="非常紧急" />
       </el-select>
       <el-select
-        v-if="isAdmin"
         v-model="filters.departmentId"
         clearable
         placeholder="全部问诊科室"
@@ -256,7 +196,6 @@ onMounted(async () => {
         />
       </el-select>
       <el-select
-        v-if="isAdmin"
         v-model="filters.assignment"
         class="assignment-filter"
         placeholder="全部分配状态"
@@ -317,17 +256,7 @@ onMounted(async () => {
         </el-table-column>
         <el-table-column fixed="right" label="操作" width="105">
           <template #default="{ row }">
-            <el-button
-              v-if="!isAdmin && !row.doctorId"
-              link
-              type="success"
-              @click="claimConsultation(row)"
-            >
-              认领问诊
-            </el-button>
-            <el-button v-else link type="primary" @click="openDetails(row)">
-              {{ isAdmin ? '查看调度' : '查看处理' }}
-            </el-button>
+            <el-button link type="primary" @click="openDetails(row)">查看调度</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -346,7 +275,7 @@ onMounted(async () => {
     <el-drawer
       v-model="drawerVisible"
       size="min(580px, 94vw)"
-      :title="isAdmin ? '问诊调度详情' : '问诊处理详情'"
+      title="问诊调度详情"
     >
       <div v-if="selected" class="details">
         <div class="detail-summary">
@@ -368,7 +297,7 @@ onMounted(async () => {
           <div><dt>患者备注</dt><dd>{{ selected.patientNote || '未填' }}</dd></div>
         </dl>
 
-        <section v-if="isAdmin" class="assignment-panel department-panel">
+        <section class="assignment-panel department-panel">
           <div>
             <strong>问诊科室</strong>
             <span>调整科室不会改变当前负责医生和问诊状态。</span>
@@ -395,7 +324,7 @@ onMounted(async () => {
           <small v-if="selected.status === '已完成'">已完成问诊不能修改科室。</small>
         </section>
 
-        <section v-if="isAdmin" class="assignment-panel">
+        <section class="assignment-panel">
           <div>
             <strong>负责医生</strong>
             <span>分配或转派后，问诊会回到待接诊状态。</span>
@@ -424,24 +353,6 @@ onMounted(async () => {
           <small v-if="selected.status === '已完成'">已完成问诊不能重新分配。</small>
         </section>
 
-        <el-form v-else label-position="top">
-          <el-form-item label="处理状态">
-            <el-select v-model="updateForm.status">
-              <el-option label="待接诊" value="待接诊" />
-              <el-option label="接诊中" value="接诊中" />
-              <el-option label="已完成" value="已完成" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="医生备注">
-            <el-input
-              v-model="updateForm.doctorNote"
-              :rows="5"
-              placeholder="填写患者可以看到的处理说明"
-              type="textarea"
-            />
-          </el-form-item>
-          <el-button type="primary" :loading="saving" @click="saveUpdate">保存处理结果</el-button>
-        </el-form>
       </div>
     </el-drawer>
   </section>
