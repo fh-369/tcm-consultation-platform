@@ -22,6 +22,16 @@ public class PersonnelRecord {
 
     private String department;
 
+    private Long departmentId;
+
+    private String qualification;
+
+    private String profile;
+
+    private String approvalStatus;
+
+    private String approvalNote;
+
     private Boolean enabled;
 
     private LocalDateTime createdAt;

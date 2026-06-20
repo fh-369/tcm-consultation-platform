@@ -14,6 +14,7 @@ import com.tcm.platform.entity.PatientAccount;
 import com.tcm.platform.entity.Recipe;
 import com.tcm.platform.entity.User;
 import com.tcm.platform.mapper.AccountMapper;
+import com.tcm.platform.mapper.DepartmentMapper;
 import com.tcm.platform.mapper.PatientAccountMapper;
 import com.tcm.platform.mapper.ConsultationMapper;
 import com.tcm.platform.mapper.KnowledgeArticleMapper;
@@ -114,6 +115,9 @@ class ApiSystemTest {
 
     @MockBean
     private UserMapper userMapper;
+
+    @MockBean
+    private DepartmentMapper departmentMapper;
 
     @MockBean
     private ConsultationMapper consultationMapper;

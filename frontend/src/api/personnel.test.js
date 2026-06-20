@@ -38,4 +38,36 @@ describe('personnel management API', () => {
     })
     expect(result.enabled).toBe(false)
   })
+
+  it('reviews doctor applications', async () => {
+    request.put.mockResolvedValue({
+      data: {
+        code: 200,
+        data: { accountId: 8, approvalStatus: 'APPROVED', enabled: true },
+      },
+    })
+    const { reviewDoctor } = await import('./personnel')
+    const payload = { approvalStatus: 'APPROVED', approvalNote: '资料核验通过' }
+
+    const result = await reviewDoctor(8, payload)
+
+    expect(request.put).toHaveBeenCalledWith('/admin/personnel/doctors/8/review', payload)
+    expect(result.enabled).toBe(true)
+  })
+
+  it('updates doctor profiles', async () => {
+    request.put.mockResolvedValue({
+      data: {
+        code: 200,
+        data: { accountId: 8, departmentName: '中医内科' },
+      },
+    })
+    const { updateDoctorProfile } = await import('./personnel')
+    const payload = { displayName: '李医生', departmentId: 2 }
+
+    const result = await updateDoctorProfile(8, payload)
+
+    expect(request.put).toHaveBeenCalledWith('/admin/personnel/doctors/8/profile', payload)
+    expect(result.departmentName).toBe('中医内科')
+  })
 })

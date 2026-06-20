@@ -2,7 +2,18 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
-import { getPersonnel, updateAccountEnabled } from '../../api/personnel'
+import { getDepartments } from '../../api/auth'
+import {
+  getPersonnel,
+  reviewDoctor,
+  updateAccountEnabled,
+  updateDoctorProfile,
+} from '../../api/personnel'
+import {
+  approvalMeta,
+  canEnableDoctor,
+  doctorReviewActions,
+} from '../../features/admin/doctorAdmission'
 
 const props = defineProps({
   resource: {
@@ -16,19 +27,39 @@ const loading = ref(false)
 const updatingId = ref(null)
 const records = ref([])
 const total = ref(0)
+const departments = ref([])
+const reviewVisible = ref(false)
+const profileVisible = ref(false)
+const activeDoctor = ref(null)
+const reviewForm = reactive({
+  approvalStatus: 'APPROVED',
+  approvalNote: '',
+})
+const profileForm = reactive({
+  displayName: '',
+  departmentId: null,
+  phone: '',
+  qualification: '',
+  profile: '',
+})
 const filters = reactive({
   current: 1,
   size: 10,
   keyword: '',
+  approvalStatus: '',
 })
 
 const isDoctors = computed(() => props.resource === 'doctors')
+const reviewOptions = computed(() => doctorReviewActions(activeDoctor.value).map((value) => ({
+  value,
+  label: value === 'APPROVED' ? '通过申请' : '驳回申请',
+})))
 const pageCopy = computed(() => (
   isDoctors.value
     ? {
         title: '医生管理',
-        description: '查看医生账号、所属科室与当前使用状态。',
-        search: '搜索用户名、医生姓名或科室',
+        description: '审核医生入驻申请，维护科室资料与账号状态。',
+        search: '搜索用户名、医生姓名、科室或联系电话',
         empty: '暂无医生账号',
       }
     : {
@@ -67,6 +98,15 @@ async function loadPersonnel() {
   }
 }
 
+async function loadDepartments() {
+  if (!isDoctors.value) return
+  try {
+    departments.value = await getDepartments()
+  } catch (error) {
+    ElMessage.error(errorMessage(error, '科室信息加载失败'))
+  }
+}
+
 function search() {
   filters.current = 1
   loadPersonnel()
@@ -75,10 +115,15 @@ function search() {
 function resetFilters() {
   filters.current = 1
   filters.keyword = ''
+  filters.approvalStatus = ''
   loadPersonnel()
 }
 
 async function changeStatus(row, enabled) {
+  if (isDoctors.value && enabled && !canEnableDoctor(row)) {
+    ElMessage.warning('医生尚未通过审核，不能启用账号')
+    return
+  }
   const action = enabled ? '启用' : '停用'
   try {
     await ElMessageBox.confirm(
@@ -106,15 +151,100 @@ async function changeStatus(row, enabled) {
   }
 }
 
+function openReview(row) {
+  activeDoctor.value = row
+  reviewForm.approvalStatus = doctorReviewActions(row)[0] || 'APPROVED'
+  reviewForm.approvalNote = row.approvalNote || ''
+  reviewVisible.value = true
+}
+
+async function submitReview() {
+  if (reviewForm.approvalStatus === 'REJECTED' && !reviewForm.approvalNote.trim()) {
+    ElMessage.warning('驳回申请时请填写审核备注')
+    return
+  }
+
+  updatingId.value = activeDoctor.value.id
+  try {
+    const result = await reviewDoctor(activeDoctor.value.id, {
+      approvalStatus: reviewForm.approvalStatus,
+      approvalNote: reviewForm.approvalNote.trim(),
+    })
+    activeDoctor.value.approvalStatus = result.approvalStatus
+    activeDoctor.value.approvalNote = result.approvalNote
+    activeDoctor.value.enabled = result.enabled
+    reviewVisible.value = false
+    ElMessage.success(result.approvalStatus === 'APPROVED' ? '医生申请已通过' : '医生申请已驳回')
+    await loadPersonnel()
+  } catch (error) {
+    ElMessage.error(errorMessage(error, '医生申请审核失败'))
+  } finally {
+    updatingId.value = null
+  }
+}
+
+function openProfile(row) {
+  activeDoctor.value = row
+  Object.assign(profileForm, {
+    displayName: row.displayName || '',
+    departmentId: row.departmentId || null,
+    phone: row.phone || '',
+    qualification: row.qualification || '',
+    profile: row.profile || '',
+  })
+  profileVisible.value = true
+}
+
+async function submitProfile() {
+  if (!profileForm.displayName.trim()) {
+    ElMessage.warning('请填写医生姓名')
+    return
+  }
+  if (!profileForm.departmentId) {
+    ElMessage.warning('请选择所属科室')
+    return
+  }
+  if (!/^1\d{10}$/.test(profileForm.phone.trim())) {
+    ElMessage.warning('请输入 11 位手机号')
+    return
+  }
+  if (!profileForm.qualification.trim()) {
+    ElMessage.warning('请填写资质或执业信息')
+    return
+  }
+
+  updatingId.value = activeDoctor.value.id
+  try {
+    await updateDoctorProfile(activeDoctor.value.id, {
+      displayName: profileForm.displayName.trim(),
+      departmentId: profileForm.departmentId,
+      phone: profileForm.phone.trim(),
+      qualification: profileForm.qualification.trim(),
+      profile: profileForm.profile.trim(),
+    })
+    profileVisible.value = false
+    ElMessage.success('医生资料已更新')
+    await loadPersonnel()
+  } catch (error) {
+    ElMessage.error(errorMessage(error, '医生资料更新失败'))
+  } finally {
+    updatingId.value = null
+  }
+}
+
 watch(
   () => props.resource,
   () => {
-    Object.assign(filters, { current: 1, size: 10, keyword: '' })
+    Object.assign(filters, { current: 1, size: 10, keyword: '', approvalStatus: '' })
+    loadDepartments()
     loadPersonnel()
   },
 )
 
-onMounted(loadPersonnel)
+onMounted(() => {
+  loadDepartments()
+  loadPersonnel()
+})
 </script>
 
 <template>
@@ -138,6 +268,17 @@ onMounted(loadPersonnel)
         @clear="search"
         @keyup.enter="search"
       />
+      <el-select
+        v-if="isDoctors"
+        v-model="filters.approvalStatus"
+        clearable
+        placeholder="全部审核状态"
+        @change="search"
+      >
+        <el-option label="待审核" value="PENDING" />
+        <el-option label="已通过" value="APPROVED" />
+        <el-option label="未通过" value="REJECTED" />
+      </el-select>
       <el-button type="primary" @click="search">搜索</el-button>
       <el-button @click="resetFilters">重置</el-button>
     </section>
@@ -159,12 +300,23 @@ onMounted(loadPersonnel)
         <el-table-column v-if="isDoctors" label="科室" min-width="150">
           <template #default="{ row }">{{ row.department || '暂未设置' }}</template>
         </el-table-column>
+        <el-table-column v-if="isDoctors" label="联系电话" min-width="145">
+          <template #default="{ row }">{{ row.phone || '暂未填写' }}</template>
+        </el-table-column>
         <el-table-column v-else label="手机号" min-width="150">
           <template #default="{ row }">{{ row.phone || '暂未填写' }}</template>
         </el-table-column>
 
         <el-table-column label="注册时间" min-width="180">
           <template #default="{ row }">{{ formatTime(row.createdAt) }}</template>
+        </el-table-column>
+
+        <el-table-column v-if="isDoctors" label="审核状态" min-width="130">
+          <template #default="{ row }">
+            <span :class="['approval-status', approvalMeta(row.approvalStatus).tone]">
+              {{ approvalMeta(row.approvalStatus).label }}
+            </span>
+          </template>
         </el-table-column>
 
         <el-table-column label="账号状态" min-width="130">
@@ -176,12 +328,28 @@ onMounted(loadPersonnel)
           </template>
         </el-table-column>
 
-        <el-table-column align="right" label="操作" width="130">
+        <el-table-column align="right" label="操作" :width="isDoctors ? 250 : 130">
           <template #default="{ row }">
+            <el-button
+              v-if="isDoctors && doctorReviewActions(row).length"
+              link
+              type="primary"
+              @click="openReview(row)"
+            >
+              审核申请
+            </el-button>
+            <el-button
+              v-if="isDoctors"
+              link
+              @click="openProfile(row)"
+            >
+              编辑资料
+            </el-button>
             <el-button
               link
               :loading="updatingId === row.id"
               :type="row.enabled ? 'danger' : 'success'"
+              :disabled="isDoctors && !row.enabled && !canEnableDoctor(row)"
               @click="changeStatus(row, !row.enabled)"
             >
               {{ row.enabled ? '停用账号' : '恢复账号' }}
@@ -207,6 +375,106 @@ onMounted(loadPersonnel)
         @current-change="(page) => { filters.current = page; loadPersonnel() }"
       />
     </section>
+
+    <el-dialog
+      v-model="reviewVisible"
+      class="doctor-dialog"
+      title="审核医生申请"
+      width="520"
+    >
+      <div v-if="activeDoctor" class="review-summary">
+        <span>{{ (activeDoctor.displayName || activeDoctor.username).slice(0, 1) }}</span>
+        <div>
+          <strong>{{ activeDoctor.displayName || activeDoctor.username }}</strong>
+          <small>{{ activeDoctor.department || '暂未设置科室' }} · @{{ activeDoctor.username }}</small>
+        </div>
+      </div>
+
+      <el-form label-position="top">
+        <el-form-item label="审核结果">
+          <el-segmented
+            v-model="reviewForm.approvalStatus"
+            :options="reviewOptions"
+          />
+        </el-form-item>
+        <el-form-item :label="reviewForm.approvalStatus === 'REJECTED' ? '驳回原因' : '审核备注'">
+          <el-input
+            v-model="reviewForm.approvalNote"
+            :rows="3"
+            maxlength="500"
+            :placeholder="reviewForm.approvalStatus === 'REJECTED'
+              ? '请说明需要补充或修正的资料'
+              : '可填写资料核验说明，选填'"
+            resize="none"
+            show-word-limit
+            type="textarea"
+          />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="reviewVisible = false">取消</el-button>
+        <el-button
+          type="primary"
+          :loading="updatingId === activeDoctor?.id"
+          @click="submitReview"
+        >
+          确认审核
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="profileVisible"
+      class="doctor-dialog"
+      title="编辑医生资料"
+      width="620"
+    >
+      <el-form label-position="top">
+        <div class="dialog-field-grid">
+          <el-form-item label="医生姓名">
+            <el-input v-model="profileForm.displayName" />
+          </el-form-item>
+          <el-form-item label="所属科室">
+            <el-select v-model="profileForm.departmentId" placeholder="请选择科室">
+              <el-option
+                v-for="department in departments"
+                :key="department.id"
+                :label="department.name"
+                :value="department.id"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="联系电话">
+            <el-input v-model="profileForm.phone" maxlength="11" />
+          </el-form-item>
+          <el-form-item label="资质或执业信息">
+            <el-input v-model="profileForm.qualification" maxlength="500" />
+          </el-form-item>
+        </div>
+        <el-form-item label="个人简介">
+          <el-input
+            v-model="profileForm.profile"
+            :rows="4"
+            maxlength="1000"
+            resize="none"
+            show-word-limit
+            type="textarea"
+          />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="profileVisible = false">取消</el-button>
+        <el-button
+          type="primary"
+          :loading="updatingId === activeDoctor?.id"
+          @click="submitProfile"
+        >
+          保存资料
+        </el-button>
+      </template>
+    </el-dialog>
   </section>
 </template>
 
@@ -274,6 +542,10 @@ onMounted(loadPersonnel)
 
 .personnel-toolbar .el-input {
   width: min(420px, 100%);
+}
+
+.personnel-toolbar .el-select {
+  width: 170px;
 }
 
 .personnel-table-card {
@@ -347,6 +619,112 @@ onMounted(loadPersonnel)
 
 .account-status.disabled i {
   background: var(--color-cinnabar);
+}
+
+.approval-status {
+  display: inline-flex;
+  min-width: 62px;
+  justify-content: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.approval-status.pending {
+  background: #f6ecd8;
+  color: #9a6a16;
+}
+
+.approval-status.approved {
+  background: #e4f1e9;
+  color: #256343;
+}
+
+.approval-status.rejected {
+  background: #f6e6e2;
+  color: #a64939;
+}
+
+.approval-status.unknown {
+  background: #edf0ee;
+  color: #6c7972;
+}
+
+.review-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: -4px 0 22px;
+  padding: 14px;
+  border: 1px solid rgb(47 95 72 / 10%);
+  border-radius: 15px;
+  background: #f5f8f6;
+}
+
+.review-summary > span {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  background: var(--color-ink);
+  color: white;
+  font-family: "Noto Serif SC", "STSong", serif;
+  font-weight: 900;
+  place-items: center;
+}
+
+.review-summary strong,
+.review-summary small {
+  display: block;
+}
+
+.review-summary strong {
+  color: var(--color-ink);
+}
+
+.review-summary small {
+  margin-top: 5px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.dialog-field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 14px;
+}
+
+.dialog-field-grid .el-select {
+  width: 100%;
+}
+
+:deep(.doctor-dialog) {
+  border-radius: 22px;
+  overflow: hidden;
+}
+
+:deep(.doctor-dialog .el-dialog__header) {
+  padding: 22px 24px 14px;
+}
+
+:deep(.doctor-dialog .el-dialog__title) {
+  color: var(--color-ink);
+  font-family: "Noto Serif SC", "STSong", serif;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+:deep(.doctor-dialog .el-dialog__body) {
+  padding: 12px 24px;
+}
+
+:deep(.doctor-dialog .el-dialog__footer) {
+  padding: 14px 24px 22px;
+}
+
+:deep(.doctor-dialog .el-segmented) {
+  width: 100%;
 }
 
 .empty-state {

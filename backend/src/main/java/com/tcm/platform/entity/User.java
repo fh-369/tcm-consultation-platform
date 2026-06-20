@@ -27,6 +27,22 @@ public class User {
 
     private String department;
 
+    private Long departmentId;
+
+    private String phone;
+
+    private String qualification;
+
+    private String profile;
+
+    private String approvalStatus;
+
+    private String approvalNote;
+
+    private LocalDateTime approvedAt;
+
+    private Long approvedBy;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 

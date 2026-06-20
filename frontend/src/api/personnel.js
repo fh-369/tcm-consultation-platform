@@ -17,3 +17,11 @@ export async function getPersonnel(resource, params) {
 export async function updateAccountEnabled(id, enabled) {
   return unwrapResult(await request.put(`/admin/personnel/accounts/${id}/status`, { enabled }))
 }
+
+export async function reviewDoctor(id, payload) {
+  return unwrapResult(await request.put(`/admin/personnel/doctors/${id}/review`, payload))
+}
+
+export async function updateDoctorProfile(id, payload) {
+  return unwrapResult(await request.put(`/admin/personnel/doctors/${id}/profile`, payload))
+}

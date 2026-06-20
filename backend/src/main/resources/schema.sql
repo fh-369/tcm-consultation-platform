@@ -21,6 +21,26 @@ CREATE TABLE accounts (
     INDEX idx_account_role (role)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='全局登录账号表';
 
+-- 科室主数据
+CREATE TABLE departments (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
+    code VARCHAR(50) NOT NULL UNIQUE COMMENT '稳定科室编码',
+    name VARCHAR(100) NOT NULL UNIQUE COMMENT '科室名称',
+    description VARCHAR(500) COMMENT '科室说明',
+    enabled TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否启用',
+    sort_order INT NOT NULL DEFAULT 0 COMMENT '展示顺序',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    INDEX idx_department_enabled_sort (enabled, sort_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='科室主数据';
+
+INSERT INTO departments (code, name, description, sort_order) VALUES
+('general', '综合咨询', '暂不确定具体科室时，由平台协助分诊。', 10),
+('internal-medicine', '中医内科', '面向常见内科不适与日常调养需求。', 20),
+('gynecology', '中医妇科', '面向女性生理周期与妇科相关调养需求。', 30),
+('pediatrics', '中医儿科', '面向儿童常见不适与成长调养需求。', 40),
+('acupuncture-tuina', '针灸推拿科', '面向经络、疼痛、运动劳损与推拿调理需求。', 50);
+
 -- 用户表 (医生/管理员)
 CREATE TABLE users (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
@@ -30,11 +50,24 @@ CREATE TABLE users (
     role ENUM('admin', 'doctor') NOT NULL DEFAULT 'doctor' COMMENT '角色',
     display_name VARCHAR(100) COMMENT '显示名称',
     department VARCHAR(100) COMMENT '科室',
+    department_id BIGINT COMMENT '所属科室ID',
+    phone VARCHAR(20) COMMENT '医生联系电话',
+    qualification VARCHAR(500) COMMENT '资质或执业信息',
+    profile VARCHAR(1000) COMMENT '医生简介',
+    approval_status ENUM('PENDING', 'APPROVED', 'REJECTED') NOT NULL DEFAULT 'PENDING'
+        COMMENT '医生申请审核状态',
+    approval_note VARCHAR(500) COMMENT '审核备注',
+    approved_at DATETIME COMMENT '审核通过时间',
+    approved_by BIGINT COMMENT '审核管理员用户ID',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     INDEX idx_username (username),
     INDEX idx_role (role),
-    FOREIGN KEY (account_id) REFERENCES accounts(id)
+    INDEX idx_user_department (department_id),
+    INDEX idx_user_approval_status (approval_status),
+    FOREIGN KEY (account_id) REFERENCES accounts(id),
+    FOREIGN KEY (department_id) REFERENCES departments(id),
+    FOREIGN KEY (approved_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
 
 -- 患者账号表
@@ -139,8 +172,20 @@ INSERT INTO accounts (username, password_hash, role) VALUES
 ('admin', '$2a$10$dOmQRUxZF5udxjV651CP0ez4T0.iQNvC6BVZMZOCpY2WhZCscfWfO', 'admin'),
 ('doctor1', '$2a$10$oBczDgrrscIsIBdZTBfQlOLNNnUTDf1665Hawnxn.BAtVgZOaizxG', 'doctor');
 
-INSERT INTO users (account_id, username, password_hash, role, display_name) VALUES
-((SELECT id FROM accounts WHERE username = 'admin'), 'admin', '$2a$10$dOmQRUxZF5udxjV651CP0ez4T0.iQNvC6BVZMZOCpY2WhZCscfWfO', 'admin', '系统管理员');
+INSERT INTO users (account_id, username, password_hash, role, display_name, approval_status, approved_at) VALUES
+((SELECT id FROM accounts WHERE username = 'admin'), 'admin', '$2a$10$dOmQRUxZF5udxjV651CP0ez4T0.iQNvC6BVZMZOCpY2WhZCscfWfO', 'admin', '系统管理员', 'APPROVED', CURRENT_TIMESTAMP);
 
-INSERT INTO users (account_id, username, password_hash, role, display_name, department) VALUES
-((SELECT id FROM accounts WHERE username = 'doctor1'), 'doctor1', '$2a$10$oBczDgrrscIsIBdZTBfQlOLNNnUTDf1665Hawnxn.BAtVgZOaizxG', 'doctor', '张医生', '内科');
+INSERT INTO users (
+    account_id, username, password_hash, role, display_name,
+    department, department_id, approval_status, approved_at
+) VALUES (
+    (SELECT id FROM accounts WHERE username = 'doctor1'),
+    'doctor1',
+    '$2a$10$oBczDgrrscIsIBdZTBfQlOLNNnUTDf1665Hawnxn.BAtVgZOaizxG',
+    'doctor',
+    '张医生',
+    '中医内科',
+    (SELECT id FROM departments WHERE code = 'internal-medicine'),
+    'APPROVED',
+    CURRENT_TIMESTAMP
+);

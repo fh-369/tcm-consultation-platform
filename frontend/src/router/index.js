@@ -107,6 +107,12 @@ const router = createRouter({
           component: () => import('../views/auth/AuthView.vue'),
           meta: { guestOnly: true },
         },
+        {
+          path: 'doctor/apply',
+          name: 'doctor-apply',
+          component: () => import('../views/auth/DoctorApplicationView.vue'),
+          meta: { guestOnly: true },
+        },
       ],
     },
     {

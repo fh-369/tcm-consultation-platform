@@ -46,18 +46,28 @@ public interface AccountMapper extends BaseMapper<Account> {
                    a.username,
                    a.role,
                    u.display_name AS displayName,
-                   NULL AS phone,
-                   u.department,
+                   u.phone,
+                   COALESCE(d.name, u.department) AS department,
+                   u.department_id AS departmentId,
+                   u.qualification,
+                   u.profile,
+                   u.approval_status AS approvalStatus,
+                   u.approval_note AS approvalNote,
                    a.enabled,
                    a.created_at AS createdAt
             FROM accounts a
             JOIN users u ON u.account_id = a.id
+            LEFT JOIN departments d ON d.id = u.department_id
             WHERE a.role = 'doctor'
+            <if test="approvalStatus != null and approvalStatus != ''">
+              AND u.approval_status = #{approvalStatus}
+            </if>
             <if test="keyword != null and keyword != ''">
               AND (
                 a.username LIKE CONCAT('%', #{keyword}, '%')
                 OR u.display_name LIKE CONCAT('%', #{keyword}, '%')
-                OR u.department LIKE CONCAT('%', #{keyword}, '%')
+                OR COALESCE(d.name, u.department) LIKE CONCAT('%', #{keyword}, '%')
+                OR u.phone LIKE CONCAT('%', #{keyword}, '%')
               )
             </if>
             ORDER BY a.created_at DESC, a.id DESC
@@ -65,6 +75,7 @@ public interface AccountMapper extends BaseMapper<Account> {
             """)
     IPage<PersonnelRecord> selectDoctorPersonnel(
             Page<PersonnelRecord> page,
-            @Param("keyword") String keyword
+            @Param("keyword") String keyword,
+            @Param("approvalStatus") String approvalStatus
     );
 }
