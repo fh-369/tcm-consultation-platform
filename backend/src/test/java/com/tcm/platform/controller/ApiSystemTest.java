@@ -213,6 +213,7 @@ class ApiSystemTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
+                                  "departmentId":2,
                                   "patientName":"李女士",
                                   "age":35,
                                   "gender":"女",
@@ -389,6 +390,13 @@ class ApiSystemTest {
                                 {"doctorId":7}
                                 """))
                 .andExpect(status().isForbidden());
+
+        mockMvc.perform(put("/api/admin/consultation/9/department")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"departmentId":3}
+                                """))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -398,6 +406,12 @@ class ApiSystemTest {
         assigned.setId(9L);
         assigned.setDoctorId(6L);
         when(consultationWorkspaceService.assign(9L, 6L)).thenReturn(assigned);
+        Consultation changedDepartment = new Consultation();
+        changedDepartment.setId(9L);
+        changedDepartment.setDepartmentId(3L);
+        changedDepartment.setDepartmentName("中医妇科");
+        when(consultationWorkspaceService.updateDepartment(9L, 3L))
+                .thenReturn(changedDepartment);
 
         mockMvc.perform(put("/api/admin/consultation/9/assignment")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -409,6 +423,14 @@ class ApiSystemTest {
 
         mockMvc.perform(put("/api/admin/consultation/9/claim"))
                 .andExpect(status().isForbidden());
+
+        mockMvc.perform(put("/api/admin/consultation/9/department")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"departmentId":3}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.departmentName").value("中医妇科"));
     }
 
     @Test

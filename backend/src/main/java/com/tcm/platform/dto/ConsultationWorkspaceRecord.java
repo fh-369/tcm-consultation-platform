@@ -9,6 +9,8 @@ public class ConsultationWorkspaceRecord {
 
     private Long id;
     private Long patientAccountId;
+    private Long departmentId;
+    private String departmentName;
     private String patientName;
     private Integer age;
     private String gender;

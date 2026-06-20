@@ -90,6 +90,7 @@ CREATE TABLE patient_accounts (
 CREATE TABLE consultations (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
     patient_account_id BIGINT COMMENT '患者账号ID',
+    department_id BIGINT NOT NULL COMMENT '问诊科室ID',
     patient_name VARCHAR(100) NOT NULL COMMENT '患者姓名',
     age INT COMMENT '年龄',
     gender ENUM('男', '女', '其他') COMMENT '性别',
@@ -108,11 +109,13 @@ CREATE TABLE consultations (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     INDEX idx_patient_account (patient_account_id),
+    INDEX idx_consultation_department (department_id),
     INDEX idx_status (status),
     INDEX idx_urgency (urgency),
     INDEX idx_doctor (doctor_id),
     INDEX idx_created_at (created_at),
     FOREIGN KEY (patient_account_id) REFERENCES patient_accounts(id) ON DELETE SET NULL,
+    FOREIGN KEY (department_id) REFERENCES departments(id),
     FOREIGN KEY (doctor_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='问诊单表';
 

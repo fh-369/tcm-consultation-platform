@@ -17,6 +17,11 @@ public class Consultation {
 
     private Long patientAccountId;
 
+    private Long departmentId;
+
+    @TableField(exist = false)
+    private String departmentName;
+
     private String patientName;
 
     private Integer age;

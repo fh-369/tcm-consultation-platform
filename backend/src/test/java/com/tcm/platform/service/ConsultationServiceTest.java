@@ -6,9 +6,11 @@ import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcm.platform.entity.Consultation;
+import com.tcm.platform.entity.Department;
 import com.tcm.platform.dto.ConsultationRequest;
 import com.tcm.platform.dto.ConsultationUpdateRequest;
 import com.tcm.platform.mapper.ConsultationMapper;
+import com.tcm.platform.mapper.DepartmentMapper;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -41,9 +43,12 @@ class ConsultationServiceTest {
     @Mock
     private ReminderService reminderService;
 
+    @Mock
+    private DepartmentMapper departmentMapper;
+
     @Test
     void listConsultationsSearchesPatientNameOrSymptomsByKeyword() {
-        ConsultationService service = new ConsultationService(consultationMapper, reminderService);
+        ConsultationService service = service();
         when(consultationMapper.selectPage(any(IPage.class), any(LambdaQueryWrapper.class)))
                 .thenReturn(new Page<>());
 
@@ -59,12 +64,14 @@ class ConsultationServiceTest {
 
     @Test
     void createConsultationAppliesDefaultsAndReminderBeforeInsert() {
-        ConsultationService service = new ConsultationService(consultationMapper, reminderService);
+        ConsultationService service = service();
         when(consultationMapper.insert(any(Consultation.class))).thenReturn(1);
+        when(departmentMapper.selectById(2L)).thenReturn(department(2L, true));
         ConsultationRequest request = consultationRequest(null);
 
         Consultation created = service.createConsultation(request);
 
+        assertThat(created.getDepartmentId()).isEqualTo(2L);
         assertThat(created.getUrgency()).isEqualTo("普通");
         assertThat(created.getStatus()).isEqualTo("待接诊");
         assertThat(created.getPatientName()).isEqualTo("李女士");
@@ -74,7 +81,7 @@ class ConsultationServiceTest {
 
     @Test
     void createConsultationRejectsInvalidUrgencyBeforeInsert() {
-        ConsultationService service = new ConsultationService(consultationMapper, reminderService);
+        ConsultationService service = service();
 
         assertThatThrownBy(() -> service.createConsultation(consultationRequest("最高优先")))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -86,7 +93,7 @@ class ConsultationServiceTest {
 
     @Test
     void listConsultationsRejectsInvalidPaginationAndFilters() {
-        ConsultationService service = new ConsultationService(consultationMapper, reminderService);
+        ConsultationService service = service();
 
         assertThatThrownBy(() -> service.listConsultations(0, 10, null, null, null, null))
                 .hasMessage("页码必须大于 0");
@@ -102,7 +109,7 @@ class ConsultationServiceTest {
 
     @Test
     void updateConsultationChangesProvidedFieldsAndKeepsOtherValues() {
-        ConsultationService service = new ConsultationService(consultationMapper, reminderService);
+        ConsultationService service = service();
         Consultation existing = new Consultation();
         existing.setId(7L);
         existing.setStatus("待接诊");
@@ -124,7 +131,7 @@ class ConsultationServiceTest {
 
     @Test
     void updateConsultationRejectsMissingRecordAndInvalidStatus() {
-        ConsultationService service = new ConsultationService(consultationMapper, reminderService);
+        ConsultationService service = service();
         when(consultationMapper.selectById(99L)).thenReturn(null);
 
         assertThatThrownBy(() -> service.updateConsultation(99L, new ConsultationUpdateRequest()))
@@ -141,9 +148,29 @@ class ConsultationServiceTest {
         verify(consultationMapper, never()).updateById(any());
     }
 
+    @Test
+    void createConsultationRejectsMissingOrDisabledDepartment() {
+        ConsultationRequest missingDepartment = consultationRequest("普通");
+        missingDepartment.setDepartmentId(null);
+
+        assertThatThrownBy(() -> service().createConsultation(missingDepartment))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("请选择问诊科室");
+
+        when(departmentMapper.selectById(2L)).thenReturn(department(2L, false));
+
+        assertThatThrownBy(() -> service().createConsultation(consultationRequest("普通")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("请选择有效科室");
+
+        verify(consultationMapper, never()).insert(any());
+        verify(reminderService, never()).applyReminder(any());
+    }
+
     private ConsultationRequest consultationRequest(String urgency) {
         ConsultationRequest request = new ConsultationRequest();
         request.setPatientAccountId(8L);
+        request.setDepartmentId(2L);
         request.setPatientName("李女士");
         request.setAge(35);
         request.setGender("女");
@@ -152,5 +179,17 @@ class ConsultationServiceTest {
         request.setDuration("约两周");
         request.setUrgency(urgency);
         return request;
+    }
+
+    private ConsultationService service() {
+        return new ConsultationService(consultationMapper, departmentMapper, reminderService);
+    }
+
+    private Department department(Long id, boolean enabled) {
+        Department department = new Department();
+        department.setId(id);
+        department.setName("中医内科");
+        department.setEnabled(enabled);
+        return department;
     }
 }

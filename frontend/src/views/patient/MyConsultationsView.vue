@@ -82,6 +82,9 @@ onMounted(loadConsultations)
             <span :class="['tag', `tag-${urgencyDisplay(item.urgency).tone}`]">
               {{ urgencyDisplay(item.urgency).label }}
             </span>
+            <span class="tag tag-department">
+              {{ item.departmentName || '综合咨询' }}
+            </span>
           </div>
           <time>{{ formatConsultationTime(item.createdAt) }}</time>
         </header>
@@ -109,6 +112,10 @@ onMounted(loadConsultations)
               <div>
                 <dt>持续时间</dt>
                 <dd>{{ item.duration || '未填写' }}</dd>
+              </div>
+              <div>
+                <dt>问诊科室</dt>
+                <dd>{{ item.departmentName || '综合咨询' }}</dd>
               </div>
             </dl>
             <p :class="['reminder-level', `text-${reminderDisplay(item.reminderLevel).tone}`]">
@@ -284,6 +291,11 @@ onMounted(loadConsultations)
 .tag-complete {
   background: #e5eee9;
   color: var(--color-text-muted);
+}
+
+.tag-department {
+  background: #edf3f0;
+  color: #3f6754;
 }
 
 .record-header time {

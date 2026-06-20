@@ -6,9 +6,11 @@ import com.tcm.platform.dto.ConsultationUpdateRequest;
 import com.tcm.platform.dto.ConsultationWorkspaceRecord;
 import com.tcm.platform.entity.Account;
 import com.tcm.platform.entity.Consultation;
+import com.tcm.platform.entity.Department;
 import com.tcm.platform.entity.User;
 import com.tcm.platform.mapper.AccountMapper;
 import com.tcm.platform.mapper.ConsultationMapper;
+import com.tcm.platform.mapper.DepartmentMapper;
 import com.tcm.platform.mapper.UserMapper;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
@@ -33,15 +35,18 @@ public class ConsultationWorkspaceService {
     private final ConsultationMapper consultationMapper;
     private final UserMapper userMapper;
     private final AccountMapper accountMapper;
+    private final DepartmentMapper departmentMapper;
 
     public ConsultationWorkspaceService(
             ConsultationMapper consultationMapper,
             UserMapper userMapper,
-            AccountMapper accountMapper
+            AccountMapper accountMapper,
+            DepartmentMapper departmentMapper
     ) {
         this.consultationMapper = consultationMapper;
         this.userMapper = userMapper;
         this.accountMapper = accountMapper;
+        this.departmentMapper = departmentMapper;
     }
 
     public Page<ConsultationWorkspaceRecord> listForAdmin(
@@ -51,11 +56,13 @@ public class ConsultationWorkspaceService {
             String urgency,
             String keyword,
             Long doctorId,
-            Boolean unassigned
+            Boolean unassigned,
+            Long departmentId
     ) {
         LambdaQueryWrapper<Consultation> query = baseQuery(current, size, status, urgency, keyword);
         query.eq(doctorId != null, Consultation::getDoctorId, doctorId)
-                .isNull(Boolean.TRUE.equals(unassigned), Consultation::getDoctorId);
+                .isNull(Boolean.TRUE.equals(unassigned), Consultation::getDoctorId)
+                .eq(departmentId != null, Consultation::getDepartmentId, departmentId);
         return loadRecords(current, size, query);
     }
 
@@ -133,6 +140,19 @@ public class ConsultationWorkspaceService {
         return consultation;
     }
 
+    @Transactional
+    public Consultation updateDepartment(Long consultationId, Long departmentId) {
+        Consultation consultation = requireConsultation(consultationId);
+        if (COMPLETED_STATUS.equals(consultation.getStatus())) {
+            throw new IllegalArgumentException("已完成问诊不能修改科室");
+        }
+        Department department = requireEnabledDepartment(departmentId);
+        consultation.setDepartmentId(department.getId());
+        consultation.setDepartmentName(department.getName());
+        update(consultation);
+        return consultation;
+    }
+
     private Page<ConsultationWorkspaceRecord> loadRecords(
             long current,
             long size,
@@ -147,18 +167,37 @@ public class ConsultationWorkspaceService {
                 ? Collections.emptyMap()
                 : userMapper.selectBatchIds(doctorIds).stream()
                         .collect(Collectors.toMap(User::getId, Function.identity()));
+        Set<Long> departmentIds = page.getRecords().stream()
+                .map(Consultation::getDepartmentId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<Long, Department> departments = departmentIds.isEmpty()
+                ? Collections.emptyMap()
+                : departmentMapper.selectBatchIds(departmentIds).stream()
+                        .collect(Collectors.toMap(Department::getId, Function.identity()));
 
         List<ConsultationWorkspaceRecord> records = page.getRecords().stream()
-                .map(item -> toRecord(item, doctors.get(item.getDoctorId())))
+                .map(item -> toRecord(
+                        item,
+                        doctors.get(item.getDoctorId()),
+                        departments.get(item.getDepartmentId())
+                ))
                 .toList();
         Page<ConsultationWorkspaceRecord> result = new Page<>(current, size, page.getTotal());
         result.setRecords(records);
         return result;
     }
 
-    private ConsultationWorkspaceRecord toRecord(Consultation consultation, User doctor) {
+    private ConsultationWorkspaceRecord toRecord(
+            Consultation consultation,
+            User doctor,
+            Department department
+    ) {
         ConsultationWorkspaceRecord record = new ConsultationWorkspaceRecord();
         BeanUtils.copyProperties(consultation, record);
+        if (department != null) {
+            record.setDepartmentName(department.getName());
+        }
         if (doctor != null) {
             record.setDoctorName(doctor.getDisplayName());
             record.setDoctorDepartment(doctor.getDepartment());
@@ -206,6 +245,17 @@ public class ConsultationWorkspaceService {
         if (account == null || Boolean.FALSE.equals(account.getEnabled())) {
             throw new IllegalArgumentException("该医生账号已停用");
         }
+    }
+
+    private Department requireEnabledDepartment(Long departmentId) {
+        if (departmentId == null) {
+            throw new IllegalArgumentException("请选择问诊科室");
+        }
+        Department department = departmentMapper.selectById(departmentId);
+        if (department == null || Boolean.FALSE.equals(department.getEnabled())) {
+            throw new IllegalArgumentException("请选择有效科室");
+        }
+        return department;
     }
 
     private void update(Consultation consultation) {

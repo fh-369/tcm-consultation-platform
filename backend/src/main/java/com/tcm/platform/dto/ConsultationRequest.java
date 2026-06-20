@@ -15,6 +15,9 @@ import lombok.Data;
 public class ConsultationRequest {
     
     private Long patientAccountId;
+
+    @NotNull(message = "请选择问诊科室")
+    private Long departmentId;
     
     @NotBlank(message = "请输入患者姓名")
     @Pattern(

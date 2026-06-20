@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcm.platform.common.Result;
 import com.tcm.platform.dto.ConsultationAssignmentRequest;
+import com.tcm.platform.dto.ConsultationDepartmentUpdateRequest;
 import com.tcm.platform.dto.ConsultationUpdateRequest;
 import com.tcm.platform.dto.ConsultationWorkspaceRecord;
 import com.tcm.platform.entity.Consultation;
@@ -13,6 +14,7 @@ import com.tcm.platform.mapper.UserMapper;
 import com.tcm.platform.service.ConsultationService;
 import com.tcm.platform.service.ConsultationWorkspaceService;
 import com.tcm.platform.service.KnowledgeArticleService;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -57,6 +59,7 @@ public class AdminController {
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Long doctorId,
             @RequestParam(required = false) Boolean unassigned,
+            @RequestParam(required = false) Long departmentId,
             Authentication authentication
     ) {
         User user = currentUser(authentication);
@@ -69,7 +72,7 @@ public class AdminController {
         }
         return Result.success(
                 consultationWorkspaceService.listForAdmin(
-                        current, size, status, urgency, keyword, doctorId, unassigned
+                        current, size, status, urgency, keyword, doctorId, unassigned, departmentId
                 )
         );
     }
@@ -111,6 +114,17 @@ public class AdminController {
         return Result.success(
                 "问诊认领成功",
                 consultationWorkspaceService.claim(id, doctor.getId())
+        );
+    }
+
+    @PutMapping("/consultation/{id}/department")
+    public Result<Consultation> updateConsultationDepartment(
+            @PathVariable Long id,
+            @Valid @RequestBody ConsultationDepartmentUpdateRequest request
+    ) {
+        return Result.success(
+                "问诊科室已更新",
+                consultationWorkspaceService.updateDepartment(id, request.getDepartmentId())
         );
     }
 

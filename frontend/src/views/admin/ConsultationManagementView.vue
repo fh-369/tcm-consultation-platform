@@ -6,11 +6,14 @@ import {
   assignAdminConsultation,
   claimAdminConsultation,
   getAdminConsultations,
+  updateAdminConsultationDepartment,
   updateAdminConsultation,
 } from '../../api/adminConsultation'
+import { getDepartments } from '../../api/auth'
 import { getPersonnel } from '../../api/personnel'
 import {
   formatConsultationTime,
+  isCrossDepartmentConsultation,
   reminderDisplay,
   statusDisplay,
   urgencyDisplay,
@@ -24,6 +27,7 @@ const assigning = ref(false)
 const drawerVisible = ref(false)
 const consultations = ref([])
 const doctors = ref([])
+const departments = ref([])
 const selected = ref(null)
 const total = ref(0)
 const isAdmin = computed(() => auth.role === 'admin')
@@ -34,12 +38,14 @@ const filters = reactive({
   urgency: '',
   keyword: '',
   assignment: 'all',
+  departmentId: '',
 })
 const updateForm = reactive({
   status: '',
   doctorNote: '',
 })
 const assignmentDoctorId = ref('')
+const consultationDepartmentId = ref('')
 
 function errorMessage(error, fallback) {
   return error.response?.data?.message || error.message || fallback
@@ -59,6 +65,9 @@ async function loadConsultations() {
       params.unassigned = true
     } else if (isAdmin.value && filters.assignment.startsWith('doctor:')) {
       params.doctorId = Number(filters.assignment.slice(7))
+    }
+    if (isAdmin.value && filters.departmentId) {
+      params.departmentId = Number(filters.departmentId)
     }
     const page = await getAdminConsultations(params)
     consultations.value = page.records || []
@@ -80,6 +89,14 @@ async function loadDoctors() {
   }
 }
 
+async function loadDepartments() {
+  try {
+    departments.value = await getDepartments()
+  } catch (error) {
+    ElMessage.error(errorMessage(error, '科室信息加载失败'))
+  }
+}
+
 function search() {
   filters.current = 1
   loadConsultations()
@@ -93,6 +110,7 @@ function resetFilters() {
     urgency: '',
     keyword: '',
     assignment: 'all',
+    departmentId: '',
   })
   loadConsultations()
 }
@@ -102,7 +120,33 @@ function openDetails(item) {
   updateForm.status = item.status
   updateForm.doctorNote = item.doctorNote || ''
   assignmentDoctorId.value = item.doctorId || ''
+  consultationDepartmentId.value = item.departmentId || ''
   drawerVisible.value = true
+}
+
+async function saveDepartment() {
+  if (!consultationDepartmentId.value) {
+    ElMessage.warning('请选择问诊科室')
+    return
+  }
+  assigning.value = true
+  try {
+    const updated = await updateAdminConsultationDepartment(
+      selected.value.id,
+      Number(consultationDepartmentId.value),
+    )
+    selected.value = {
+      ...selected.value,
+      departmentId: updated.departmentId,
+      departmentName: updated.departmentName,
+    }
+    ElMessage.success('问诊科室已更新')
+    await loadConsultations()
+  } catch (error) {
+    ElMessage.error(errorMessage(error, '问诊科室更新失败'))
+  } finally {
+    assigning.value = false
+  }
 }
 
 async function saveAssignment() {
@@ -163,7 +207,7 @@ async function saveUpdate() {
 }
 
 onMounted(async () => {
-  await Promise.all([loadConsultations(), loadDoctors()])
+  await Promise.all([loadConsultations(), loadDoctors(), loadDepartments()])
 })
 </script>
 
@@ -197,6 +241,19 @@ onMounted(async () => {
         <el-option label="普通" value="普通" />
         <el-option label="紧急" value="紧急" />
         <el-option label="非常紧急" value="非常紧急" />
+      </el-select>
+      <el-select
+        v-if="isAdmin"
+        v-model="filters.departmentId"
+        clearable
+        placeholder="全部问诊科室"
+      >
+        <el-option
+          v-for="department in departments"
+          :key="department.id"
+          :label="department.name"
+          :value="department.id"
+        />
       </el-select>
       <el-select
         v-if="isAdmin"
@@ -238,6 +295,11 @@ onMounted(async () => {
         <el-table-column label="提醒" min-width="110">
           <template #default="{ row }">{{ reminderDisplay(row.reminderLevel).label }}</template>
         </el-table-column>
+        <el-table-column label="问诊科室" min-width="130">
+          <template #default="{ row }">
+            <span class="department-chip">{{ row.departmentName || '综合咨询' }}</span>
+          </template>
+        </el-table-column>
         <el-table-column label="负责医生" min-width="145">
           <template #default="{ row }">
             <span v-if="row.doctorId" class="doctor-chip">
@@ -245,6 +307,9 @@ onMounted(async () => {
               <small v-if="row.doctorDepartment">{{ row.doctorDepartment }}</small>
             </span>
             <span v-else class="unassigned-chip">尚未分配</span>
+            <small v-if="isCrossDepartmentConsultation(row)" class="cross-department">
+              跨科室处理
+            </small>
           </template>
         </el-table-column>
         <el-table-column label="提交时间" min-width="170">
@@ -297,10 +362,38 @@ onMounted(async () => {
           <div><dt>患者姓名</dt><dd>{{ selected.patientName }}</dd></div>
           <div><dt>年龄 / 性别</dt><dd>{{ selected.age || '未填' }} / {{ selected.gender || '未填' }}</dd></div>
           <div><dt>手机号</dt><dd>{{ selected.phone || '未填' }}</dd></div>
+          <div><dt>问诊科室</dt><dd>{{ selected.departmentName || '综合咨询' }}</dd></div>
           <div><dt>持续时间</dt><dd>{{ selected.duration || '未填' }}</dd></div>
           <div><dt>过敏史</dt><dd>{{ selected.allergyHistory || '未填' }}</dd></div>
           <div><dt>患者备注</dt><dd>{{ selected.patientNote || '未填' }}</dd></div>
         </dl>
+
+        <section v-if="isAdmin" class="assignment-panel department-panel">
+          <div>
+            <strong>问诊科室</strong>
+            <span>调整科室不会改变当前负责医生和问诊状态。</span>
+          </div>
+          <el-select
+            v-model="consultationDepartmentId"
+            :disabled="selected.status === '已完成'"
+            placeholder="选择问诊科室"
+          >
+            <el-option
+              v-for="department in departments"
+              :key="department.id"
+              :label="department.name"
+              :value="department.id"
+            />
+          </el-select>
+          <el-button
+            :disabled="selected.status === '已完成'"
+            :loading="assigning"
+            @click="saveDepartment"
+          >
+            保存科室
+          </el-button>
+          <small v-if="selected.status === '已完成'">已完成问诊不能修改科室。</small>
+        </section>
 
         <section v-if="isAdmin" class="assignment-panel">
           <div>
@@ -437,7 +530,8 @@ onMounted(async () => {
 }
 
 .doctor-chip,
-.unassigned-chip {
+.unassigned-chip,
+.department-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -452,6 +546,11 @@ onMounted(async () => {
   color: var(--color-ink);
 }
 
+.department-chip {
+  background: #edf3f0;
+  color: #345f4a;
+}
+
 .doctor-chip small {
   color: var(--color-text-muted);
   font-size: 9px;
@@ -461,6 +560,14 @@ onMounted(async () => {
 .unassigned-chip {
   background: #f2f3ef;
   color: var(--color-text-muted);
+}
+
+.cross-department {
+  display: block;
+  margin-top: 5px;
+  color: var(--color-cinnabar);
+  font-size: 9px;
+  font-weight: 800;
 }
 
 .el-pagination {
@@ -525,6 +632,11 @@ dd {
   border: 1px solid rgb(47 95 72 / 12%);
   border-radius: 18px;
   background: #f5f8f5;
+}
+
+.department-panel {
+  margin-bottom: 14px;
+  background: #f8faf8;
 }
 
 .assignment-panel > div strong,

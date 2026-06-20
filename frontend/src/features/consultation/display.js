@@ -39,3 +39,12 @@ export function formatConsultationTime(value) {
 
   return String(value).replace('T', ' ')
 }
+
+export function isCrossDepartmentConsultation(consultation) {
+  const department = consultation?.departmentName
+  const doctorDepartment = consultation?.doctorDepartment
+  if (!department || !doctorDepartment || department === '综合咨询') {
+    return false
+  }
+  return department !== doctorDepartment
+}

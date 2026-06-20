@@ -8,9 +8,11 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcm.platform.dto.ConsultationUpdateRequest;
 import com.tcm.platform.entity.Account;
 import com.tcm.platform.entity.Consultation;
+import com.tcm.platform.entity.Department;
 import com.tcm.platform.entity.User;
 import com.tcm.platform.mapper.AccountMapper;
 import com.tcm.platform.mapper.ConsultationMapper;
+import com.tcm.platform.mapper.DepartmentMapper;
 import com.tcm.platform.mapper.UserMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeAll;
@@ -40,10 +42,13 @@ class ConsultationWorkspaceServiceTest {
         ConsultationMapper consultationMapper = mock(ConsultationMapper.class);
         UserMapper userMapper = mock(UserMapper.class);
         AccountMapper accountMapper = mock(AccountMapper.class);
+        DepartmentMapper departmentMapper = mock(DepartmentMapper.class);
         when(consultationMapper.selectPage(any(IPage.class), any(LambdaQueryWrapper.class)))
                 .thenReturn(new Page<>());
         ConsultationWorkspaceService service =
-                new ConsultationWorkspaceService(consultationMapper, userMapper, accountMapper);
+                new ConsultationWorkspaceService(
+                        consultationMapper, userMapper, accountMapper, departmentMapper
+                );
 
         service.listForDoctor(1, 10, null, null, null, 6L);
 
@@ -59,6 +64,7 @@ class ConsultationWorkspaceServiceTest {
         ConsultationMapper consultationMapper = mock(ConsultationMapper.class);
         UserMapper userMapper = mock(UserMapper.class);
         AccountMapper accountMapper = mock(AccountMapper.class);
+        DepartmentMapper departmentMapper = mock(DepartmentMapper.class);
         Consultation consultation = consultation(9L, 3L, "接诊中");
         User doctor = doctor(6L, 16L);
         Account account = new Account();
@@ -69,7 +75,9 @@ class ConsultationWorkspaceServiceTest {
         when(accountMapper.selectById(16L)).thenReturn(account);
         when(consultationMapper.updateAssignment(9L, 6L, "待接诊")).thenReturn(1);
         ConsultationWorkspaceService service =
-                new ConsultationWorkspaceService(consultationMapper, userMapper, accountMapper);
+                new ConsultationWorkspaceService(
+                        consultationMapper, userMapper, accountMapper, departmentMapper
+                );
 
         Consultation assigned = service.assign(9L, 6L);
 
@@ -83,11 +91,14 @@ class ConsultationWorkspaceServiceTest {
         ConsultationMapper consultationMapper = mock(ConsultationMapper.class);
         UserMapper userMapper = mock(UserMapper.class);
         AccountMapper accountMapper = mock(AccountMapper.class);
+        DepartmentMapper departmentMapper = mock(DepartmentMapper.class);
         Consultation consultation = consultation(9L, 6L, "接诊中");
         when(consultationMapper.selectById(9L)).thenReturn(consultation);
         when(consultationMapper.updateAssignment(9L, null, "待接诊")).thenReturn(1);
         ConsultationWorkspaceService service =
-                new ConsultationWorkspaceService(consultationMapper, userMapper, accountMapper);
+                new ConsultationWorkspaceService(
+                        consultationMapper, userMapper, accountMapper, departmentMapper
+                );
 
         Consultation unassigned = service.assign(9L, null);
 
@@ -101,11 +112,14 @@ class ConsultationWorkspaceServiceTest {
         ConsultationMapper consultationMapper = mock(ConsultationMapper.class);
         UserMapper userMapper = mock(UserMapper.class);
         AccountMapper accountMapper = mock(AccountMapper.class);
+        DepartmentMapper departmentMapper = mock(DepartmentMapper.class);
         Consultation claimedRecord = consultation(9L, 6L, "待接诊");
         when(consultationMapper.claimIfUnassigned(9L, 6L)).thenReturn(1);
         when(consultationMapper.selectById(9L)).thenReturn(claimedRecord);
         ConsultationWorkspaceService service =
-                new ConsultationWorkspaceService(consultationMapper, userMapper, accountMapper);
+                new ConsultationWorkspaceService(
+                        consultationMapper, userMapper, accountMapper, departmentMapper
+                );
 
         Consultation claimed = service.claim(9L, 6L);
 
@@ -128,16 +142,77 @@ class ConsultationWorkspaceServiceTest {
         ConsultationMapper consultationMapper = mock(ConsultationMapper.class);
         UserMapper userMapper = mock(UserMapper.class);
         AccountMapper accountMapper = mock(AccountMapper.class);
+        DepartmentMapper departmentMapper = mock(DepartmentMapper.class);
         Consultation completed = consultation(9L, 6L, "已完成");
         when(consultationMapper.claimIfUnassigned(9L, 7L)).thenReturn(0);
         when(consultationMapper.selectById(9L)).thenReturn(completed);
         ConsultationWorkspaceService service =
-                new ConsultationWorkspaceService(consultationMapper, userMapper, accountMapper);
+                new ConsultationWorkspaceService(
+                        consultationMapper, userMapper, accountMapper, departmentMapper
+                );
 
         assertThatThrownBy(() -> service.assign(9L, 7L))
                 .hasMessage("已完成问诊不能重新分配");
         assertThatThrownBy(() -> service.claim(9L, 7L))
                 .hasMessage("已完成问诊不能认领");
+    }
+
+    @Test
+    void administratorFiltersByDepartmentAndChangesDepartmentWithoutChangingAssignment() {
+        ConsultationMapper consultationMapper = mock(ConsultationMapper.class);
+        UserMapper userMapper = mock(UserMapper.class);
+        AccountMapper accountMapper = mock(AccountMapper.class);
+        DepartmentMapper departmentMapper = mock(DepartmentMapper.class);
+        when(consultationMapper.selectPage(any(IPage.class), any(LambdaQueryWrapper.class)))
+                .thenReturn(new Page<>());
+        ConsultationWorkspaceService service =
+                new ConsultationWorkspaceService(
+                        consultationMapper, userMapper, accountMapper, departmentMapper
+                );
+
+        service.listForAdmin(1, 10, null, null, null, null, null, 2L);
+
+        ArgumentCaptor<LambdaQueryWrapper<Consultation>> queryCaptor =
+                ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        verify(consultationMapper).selectPage(any(IPage.class), queryCaptor.capture());
+        assertThat(queryCaptor.getValue().getCustomSqlSegment()).contains("department_id");
+
+        Consultation consultation = consultation(9L, 6L, "接诊中");
+        consultation.setDepartmentId(1L);
+        Department department = new Department();
+        department.setId(3L);
+        department.setName("中医妇科");
+        department.setEnabled(true);
+        when(consultationMapper.selectById(9L)).thenReturn(consultation);
+        when(departmentMapper.selectById(3L)).thenReturn(department);
+        when(consultationMapper.updateById(consultation)).thenReturn(1);
+
+        Consultation updated = service.updateDepartment(9L, 3L);
+
+        assertThat(updated.getDepartmentId()).isEqualTo(3L);
+        assertThat(updated.getDoctorId()).isEqualTo(6L);
+        assertThat(updated.getStatus()).isEqualTo("接诊中");
+    }
+
+    @Test
+    void completedConsultationCannotChangeDepartment() {
+        ConsultationMapper consultationMapper = mock(ConsultationMapper.class);
+        UserMapper userMapper = mock(UserMapper.class);
+        AccountMapper accountMapper = mock(AccountMapper.class);
+        DepartmentMapper departmentMapper = mock(DepartmentMapper.class);
+        Consultation completed = consultation(9L, 6L, "已完成");
+        completed.setDepartmentId(1L);
+        when(consultationMapper.selectById(9L)).thenReturn(completed);
+        ConsultationWorkspaceService service =
+                new ConsultationWorkspaceService(
+                        consultationMapper, userMapper, accountMapper, departmentMapper
+                );
+
+        assertThatThrownBy(() -> service.updateDepartment(9L, 3L))
+                .hasMessage("已完成问诊不能修改科室");
+
+        verify(departmentMapper, never()).selectById(any());
+        verify(consultationMapper, never()).updateById(any());
     }
 
     private Consultation consultation(Long id, Long doctorId, String status) {

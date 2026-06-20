@@ -1,15 +1,19 @@
 <script setup>
-import { nextTick, reactive, ref } from 'vue'
+import { nextTick, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { CircleCheck } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 
 import { createConsultation } from '../../api/consultation'
+import { getDepartments } from '../../api/auth'
 
 const router = useRouter()
 const formRef = ref()
 const submitting = ref(false)
+const loadingDepartments = ref(false)
+const departments = ref([])
 const form = reactive({
+  departmentId: null,
   patientName: '',
   age: null,
   gender: '',
@@ -24,6 +28,7 @@ const form = reactive({
 const namePattern = /^[\u4e00-\u9fa5A-Za-z·\s]{2,50}$/
 const phonePattern = /^1[3-9]\d{9}$/
 const rules = {
+  departmentId: [{ required: true, message: '请选择问诊科室', trigger: 'change' }],
   patientName: [
     { required: true, message: '请输入患者姓名', trigger: 'blur' },
     {
@@ -59,6 +64,17 @@ const rules = {
     { max: 100, message: '症状持续时间不能超过 100 个字符', trigger: 'blur' },
   ],
   urgency: [{ required: true, message: '请选择紧急程度', trigger: 'change' }],
+}
+
+async function loadDepartments() {
+  loadingDepartments.value = true
+  try {
+    departments.value = await getDepartments()
+  } catch (error) {
+    ElMessage.error(error.response?.data?.message || error.message || '科室信息加载失败')
+  } finally {
+    loadingDepartments.value = false
+  }
 }
 
 function errorMessage(error) {
@@ -104,6 +120,8 @@ async function submit() {
     submitting.value = false
   }
 }
+
+onMounted(loadDepartments)
 </script>
 
 <template>
@@ -153,6 +171,38 @@ async function submit() {
         <div class="section-heading">
           <span>02</span>
           <div>
+            <h2>问诊方向</h2>
+            <p>选择更接近当前问题的科室，帮助平台进行后续分诊。</p>
+          </div>
+        </div>
+
+        <el-form-item
+          class="department-field"
+          label="问诊科室（必填）"
+          prop="departmentId"
+        >
+          <el-radio-group
+            v-model="form.departmentId"
+            v-loading="loadingDepartments"
+            class="department-options"
+          >
+            <el-radio
+              v-for="department in departments"
+              :key="department.id"
+              :value="department.id"
+              border
+            >
+              <strong>{{ department.name }}</strong>
+              <small>{{ department.description }}</small>
+            </el-radio>
+          </el-radio-group>
+        </el-form-item>
+      </section>
+
+      <section class="form-section">
+        <div class="section-heading">
+          <span>03</span>
+          <div>
             <h2>症状描述</h2>
             <p>重点说明不适部位、程度、持续时间和变化。</p>
           </div>
@@ -184,7 +234,7 @@ async function submit() {
 
       <section class="form-section">
         <div class="section-heading">
-          <span>03</span>
+          <span>04</span>
           <div>
             <h2>补充信息</h2>
             <p>过敏史和备注有助于医生了解整体情况。</p>
@@ -419,6 +469,56 @@ async function submit() {
     linear-gradient(145deg, #f3f8f4, #eaf4ee) !important;
 }
 
+.department-field {
+  background:
+    radial-gradient(circle at 92% 8%, rgb(255 255 255 / 94%), transparent 32%),
+    linear-gradient(145deg, #f3f8f4, #eaf4ee) !important;
+}
+
+.department-options {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.department-options :deep(.el-radio) {
+  width: 100%;
+  height: auto;
+  min-height: 78px;
+  align-items: flex-start;
+  margin: 0;
+  padding: 15px 16px;
+  border-color: rgb(65 126 96 / 15%);
+  border-radius: 14px;
+  background: rgb(255 255 255 / 78%);
+  white-space: normal;
+}
+
+.department-options :deep(.el-radio.is-bordered.is-checked) {
+  border-color: var(--color-jade);
+  background: #edf7f1;
+  box-shadow: 0 9px 22px rgb(46 112 79 / 10%);
+}
+
+.department-options :deep(.el-radio__label) {
+  display: grid;
+  gap: 6px;
+  padding-left: 10px;
+  color: var(--color-ink);
+  line-height: 1.5;
+}
+
+.department-options strong {
+  font-size: 15px;
+}
+
+.department-options small {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
 .symptom-field :deep(.el-textarea__inner) {
   min-height: 142px !important;
 }
@@ -528,6 +628,10 @@ async function submit() {
   }
 
   .field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .department-options {
     grid-template-columns: 1fr;
   }
 

@@ -25,3 +25,9 @@ export async function assignAdminConsultation(id, doctorId) {
 export async function claimAdminConsultation(id) {
   return unwrapResult(await request.put(`/admin/consultation/${id}/claim`))
 }
+
+export async function updateAdminConsultationDepartment(id, departmentId) {
+  return unwrapResult(await request.put(`/admin/consultation/${id}/department`, {
+    departmentId,
+  }))
+}
