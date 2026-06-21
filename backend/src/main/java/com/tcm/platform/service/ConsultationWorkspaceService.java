@@ -123,7 +123,12 @@ public class ConsultationWorkspaceService {
             throw new IllegalArgumentException("已完成问诊不能重新分配");
         }
         if (doctorId != null) {
-            requireEnabledDoctor(doctorId);
+            User doctor = requireActiveDoctor(doctorId);
+            Department generalDepartment = requireGeneralDepartment();
+            if (!Objects.equals(consultation.getDepartmentId(), generalDepartment.getId())
+                    && !Objects.equals(consultation.getDepartmentId(), doctor.getDepartmentId())) {
+                throw new IllegalArgumentException("只能分配给当前问诊科室的医生");
+            }
         }
 
         if (!Objects.equals(consultation.getDoctorId(), doctorId)) {
@@ -191,9 +196,21 @@ public class ConsultationWorkspaceService {
             throw new IllegalArgumentException("已完成问诊不能修改科室");
         }
         Department department = requireEnabledDepartment(departmentId);
+        if (Objects.equals(consultation.getDepartmentId(), department.getId())) {
+            consultation.setDepartmentName(department.getName());
+            return consultation;
+        }
+        if (consultationMapper.updateDepartmentAndClearAssignment(
+                consultationId,
+                department.getId(),
+                PENDING_STATUS
+        ) != 1) {
+            throw new IllegalStateException("问诊科室更新失败");
+        }
         consultation.setDepartmentId(department.getId());
         consultation.setDepartmentName(department.getName());
-        update(consultation);
+        consultation.setDoctorId(null);
+        consultation.setStatus(PENDING_STATUS);
         return consultation;
     }
 
@@ -278,17 +295,6 @@ public class ConsultationWorkspaceService {
             throw new IllegalArgumentException("问诊单不存在");
         }
         return consultation;
-    }
-
-    private void requireEnabledDoctor(Long doctorId) {
-        User doctor = userMapper.selectById(doctorId);
-        if (doctor == null || !"doctor".equals(doctor.getRole())) {
-            throw new IllegalArgumentException("请选择有效的医生");
-        }
-        Account account = accountMapper.selectById(doctor.getAccountId());
-        if (account == null || Boolean.FALSE.equals(account.getEnabled())) {
-            throw new IllegalArgumentException("该医生账号已停用");
-        }
     }
 
     private User requireActiveDoctor(Long doctorId) {

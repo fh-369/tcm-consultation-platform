@@ -43,6 +43,7 @@ public interface AccountMapper extends BaseMapper<Account> {
     @Select("""
             <script>
             SELECT a.id,
+                   u.id AS userId,
                    a.username,
                    a.role,
                    u.display_name AS displayName,

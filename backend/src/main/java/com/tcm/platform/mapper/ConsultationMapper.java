@@ -40,6 +40,20 @@ public interface ConsultationMapper extends BaseMapper<Consultation> {
             @Param("doctorId") Long doctorId
     );
 
+    @Update("""
+            UPDATE consultations
+            SET department_id = #{departmentId},
+                doctor_id = NULL,
+                status = #{status},
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = #{consultationId}
+            """)
+    int updateDepartmentAndClearAssignment(
+            @Param("consultationId") Long consultationId,
+            @Param("departmentId") Long departmentId,
+            @Param("status") String status
+    );
+
     /** 按状态统计问诊数量 */
     @Select("SELECT status, COUNT(*) AS count FROM consultations GROUP BY status")
     List<Map<String, Object>> countByStatus();

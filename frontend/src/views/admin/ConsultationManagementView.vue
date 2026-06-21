@@ -1,6 +1,6 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { computed, onMounted, reactive, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 import {
   assignAdminConsultation,
@@ -16,6 +16,7 @@ import {
   statusDisplay,
   urgencyDisplay,
 } from '../../features/consultation/display'
+import { eligibleDoctorsForDepartment } from '../../features/admin/scheduling'
 
 const loading = ref(false)
 const assigning = ref(false)
@@ -36,6 +37,23 @@ const filters = reactive({
 })
 const assignmentDoctorId = ref('')
 const consultationDepartmentId = ref('')
+const generalDepartmentId = computed(
+  () => departments.value.find((department) => department.code === 'general')?.id,
+)
+const activeDoctors = computed(
+  () => eligibleDoctorsForDepartment(
+    doctors.value,
+    null,
+    generalDepartmentId.value,
+  ),
+)
+const assignmentDoctors = computed(
+  () => eligibleDoctorsForDepartment(
+    doctors.value,
+    consultationDepartmentId.value,
+    generalDepartmentId.value,
+  ),
+)
 
 function errorMessage(error, fallback) {
   return error.response?.data?.message || error.message || fallback
@@ -72,7 +90,7 @@ async function loadConsultations() {
 async function loadDoctors() {
   try {
     const page = await getPersonnel('doctors', { current: 1, size: 100 })
-    doctors.value = (page.records || []).filter((doctor) => doctor.enabled)
+    doctors.value = page.records || []
   } catch (error) {
     ElMessage.error(errorMessage(error, '医生列表加载失败'))
   }
@@ -116,18 +134,45 @@ async function saveDepartment() {
     ElMessage.warning('请选择问诊科室')
     return
   }
+  const nextDepartmentId = Number(consultationDepartmentId.value)
+  if (nextDepartmentId === Number(selected.value.departmentId)) {
+    ElMessage.info('问诊科室未发生变化')
+    return
+  }
+  const nextDepartment = departments.value.find(
+    (department) => Number(department.id) === nextDepartmentId,
+  )
+  try {
+    await ElMessageBox.confirm(
+      `转入“${nextDepartment?.name || '所选科室'}”后，将解除当前负责医生，并把问诊恢复为待接诊。`,
+      '确认转科',
+      {
+        confirmButtonText: '确认转科',
+        cancelButtonText: '取消',
+        type: 'warning',
+      },
+    )
+  } catch {
+    consultationDepartmentId.value = selected.value.departmentId
+    return
+  }
   assigning.value = true
   try {
     const updated = await updateAdminConsultationDepartment(
       selected.value.id,
-      Number(consultationDepartmentId.value),
+      nextDepartmentId,
     )
     selected.value = {
       ...selected.value,
       departmentId: updated.departmentId,
       departmentName: updated.departmentName,
+      doctorId: null,
+      doctorName: null,
+      doctorDepartment: null,
+      status: updated.status || '待接诊',
     }
-    ElMessage.success('问诊科室已更新')
+    assignmentDoctorId.value = ''
+    ElMessage.success('转科完成，原医生已解除')
     await loadConsultations()
   } catch (error) {
     ElMessage.error(errorMessage(error, '问诊科室更新失败'))
@@ -203,10 +248,10 @@ onMounted(async () => {
         <el-option label="全部分配状态" value="all" />
         <el-option label="尚未分配" value="unassigned" />
         <el-option
-          v-for="doctor in doctors"
-          :key="doctor.id"
-          :label="doctor.displayName || doctor.username"
-          :value="`doctor:${doctor.id}`"
+          v-for="doctor in activeDoctors"
+          :key="doctor.userId"
+          :label="`${doctor.displayName || doctor.username} · ${doctor.department || '未配置科室'}`"
+          :value="`doctor:${doctor.userId}`"
         />
       </el-select>
       <el-button type="primary" @click="search">筛选</el-button>
@@ -300,7 +345,7 @@ onMounted(async () => {
         <section class="assignment-panel department-panel">
           <div>
             <strong>问诊科室</strong>
-            <span>调整科室不会改变当前负责医生和问诊状态。</span>
+            <span>转科会解除当前负责医生，并将问诊恢复为待接诊。</span>
           </div>
           <el-select
             v-model="consultationDepartmentId"
@@ -336,10 +381,10 @@ onMounted(async () => {
           >
             <el-option label="暂不分配" value="" />
             <el-option
-              v-for="doctor in doctors"
-              :key="doctor.id"
+              v-for="doctor in assignmentDoctors"
+              :key="doctor.userId"
               :label="`${doctor.displayName || doctor.username}${doctor.department ? ` · ${doctor.department}` : ''}`"
-              :value="doctor.id"
+              :value="doctor.userId"
             />
           </el-select>
           <el-button

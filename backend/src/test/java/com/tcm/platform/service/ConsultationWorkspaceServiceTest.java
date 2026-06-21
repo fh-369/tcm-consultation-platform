@@ -108,13 +108,16 @@ class ConsultationWorkspaceServiceTest {
         AccountMapper accountMapper = mock(AccountMapper.class);
         DepartmentMapper departmentMapper = mock(DepartmentMapper.class);
         Consultation consultation = consultation(9L, 3L, "接诊中");
+        consultation.setDepartmentId(2L);
         User doctor = doctor(6L, 16L);
+        Department general = department(1L, "general", "综合咨询");
         Account account = new Account();
         account.setId(16L);
         account.setEnabled(true);
         when(consultationMapper.selectById(9L)).thenReturn(consultation);
         when(userMapper.selectById(6L)).thenReturn(doctor);
         when(accountMapper.selectById(16L)).thenReturn(account);
+        when(departmentMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(general);
         when(consultationMapper.updateAssignment(9L, 6L, "待接诊")).thenReturn(1);
         ConsultationWorkspaceService service =
                 new ConsultationWorkspaceService(
@@ -126,6 +129,68 @@ class ConsultationWorkspaceServiceTest {
         assertThat(assigned.getDoctorId()).isEqualTo(6L);
         assertThat(assigned.getStatus()).isEqualTo("待接诊");
         verify(consultationMapper).updateAssignment(9L, 6L, "待接诊");
+    }
+
+    @Test
+    void administratorRejectsCrossDepartmentDoctorButAllowsAnyApprovedDoctorForGeneralConsultation() {
+        ConsultationMapper consultationMapper = mock(ConsultationMapper.class);
+        UserMapper userMapper = mock(UserMapper.class);
+        AccountMapper accountMapper = mock(AccountMapper.class);
+        DepartmentMapper departmentMapper = mock(DepartmentMapper.class);
+        User gynecologyDoctor = doctor(7L, 17L);
+        gynecologyDoctor.setDepartmentId(3L);
+        gynecologyDoctor.setDepartment("中医妇科");
+        Account account = new Account();
+        account.setId(17L);
+        account.setEnabled(true);
+        Department general = department(1L, "general", "综合咨询");
+        Consultation internalMedicine = consultation(9L, null, "待接诊");
+        internalMedicine.setDepartmentId(2L);
+        Consultation generalConsultation = consultation(10L, null, "待接诊");
+        generalConsultation.setDepartmentId(1L);
+        when(userMapper.selectById(7L)).thenReturn(gynecologyDoctor);
+        when(accountMapper.selectById(17L)).thenReturn(account);
+        when(departmentMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(general);
+        when(consultationMapper.selectById(9L)).thenReturn(internalMedicine);
+        when(consultationMapper.selectById(10L)).thenReturn(generalConsultation);
+        when(consultationMapper.updateAssignment(10L, 7L, "待接诊")).thenReturn(1);
+        ConsultationWorkspaceService service =
+                new ConsultationWorkspaceService(
+                        consultationMapper, userMapper, accountMapper, departmentMapper
+                );
+
+        assertThatThrownBy(() -> service.assign(9L, 7L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("只能分配给当前问诊科室的医生");
+
+        Consultation assigned = service.assign(10L, 7L);
+
+        assertThat(assigned.getDoctorId()).isEqualTo(7L);
+        verify(consultationMapper).updateAssignment(10L, 7L, "待接诊");
+    }
+
+    @Test
+    void administratorCannotAssignDoctorWithoutApproval() {
+        ConsultationMapper consultationMapper = mock(ConsultationMapper.class);
+        UserMapper userMapper = mock(UserMapper.class);
+        AccountMapper accountMapper = mock(AccountMapper.class);
+        DepartmentMapper departmentMapper = mock(DepartmentMapper.class);
+        Consultation consultation = consultation(9L, null, "待接诊");
+        consultation.setDepartmentId(2L);
+        User pendingDoctor = doctor(6L, 16L);
+        pendingDoctor.setApprovalStatus("PENDING");
+        when(consultationMapper.selectById(9L)).thenReturn(consultation);
+        when(userMapper.selectById(6L)).thenReturn(pendingDoctor);
+        ConsultationWorkspaceService service =
+                new ConsultationWorkspaceService(
+                        consultationMapper, userMapper, accountMapper, departmentMapper
+                );
+
+        assertThatThrownBy(() -> service.assign(9L, 6L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("医生账号尚未通过审核");
+
+        verify(consultationMapper, never()).updateAssignment(any(), any(), any());
     }
 
     @Test
@@ -259,7 +324,7 @@ class ConsultationWorkspaceServiceTest {
     }
 
     @Test
-    void administratorFiltersByDepartmentAndChangesDepartmentWithoutChangingAssignment() {
+    void administratorFiltersByDepartmentAndTransferClearsAssignmentAndResetsStatus() {
         ConsultationMapper consultationMapper = mock(ConsultationMapper.class);
         UserMapper userMapper = mock(UserMapper.class);
         AccountMapper accountMapper = mock(AccountMapper.class);
@@ -280,19 +345,18 @@ class ConsultationWorkspaceServiceTest {
 
         Consultation consultation = consultation(9L, 6L, "接诊中");
         consultation.setDepartmentId(1L);
-        Department department = new Department();
-        department.setId(3L);
-        department.setName("中医妇科");
-        department.setEnabled(true);
+        Department department = department(3L, "gynecology", "中医妇科");
         when(consultationMapper.selectById(9L)).thenReturn(consultation);
         when(departmentMapper.selectById(3L)).thenReturn(department);
-        when(consultationMapper.updateById(consultation)).thenReturn(1);
+        when(consultationMapper.updateDepartmentAndClearAssignment(9L, 3L, "待接诊"))
+                .thenReturn(1);
 
         Consultation updated = service.updateDepartment(9L, 3L);
 
         assertThat(updated.getDepartmentId()).isEqualTo(3L);
-        assertThat(updated.getDoctorId()).isEqualTo(6L);
-        assertThat(updated.getStatus()).isEqualTo("接诊中");
+        assertThat(updated.getDoctorId()).isNull();
+        assertThat(updated.getStatus()).isEqualTo("待接诊");
+        verify(consultationMapper).updateDepartmentAndClearAssignment(9L, 3L, "待接诊");
     }
 
     @Test
@@ -334,5 +398,14 @@ class ConsultationWorkspaceServiceTest {
         doctor.setDepartmentId(2L);
         doctor.setApprovalStatus("APPROVED");
         return doctor;
+    }
+
+    private Department department(Long id, String code, String name) {
+        Department department = new Department();
+        department.setId(id);
+        department.setCode(code);
+        department.setName(name);
+        department.setEnabled(true);
+        return department;
     }
 }
