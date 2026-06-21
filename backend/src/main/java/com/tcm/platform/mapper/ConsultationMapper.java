@@ -22,16 +22,14 @@ public interface ConsultationMapper extends BaseMapper<Consultation> {
                 doctor_name,
                 previous_status,
                 status,
-                doctor_note,
-                follow_up_at
+                doctor_note
             ) VALUES (
                 #{consultationId},
                 #{doctorId},
                 #{doctorName},
                 #{previousStatus},
                 #{status},
-                #{doctorNote},
-                #{followUpAt}
+                #{doctorNote}
             )
             """)
     int insertProgressRecord(ConsultationProgressRecord record);
@@ -39,7 +37,7 @@ public interface ConsultationMapper extends BaseMapper<Consultation> {
     @Select({
             "<script>",
             "SELECT id, consultation_id, doctor_id, doctor_name, previous_status, status,",
-            "doctor_note, follow_up_at, created_at",
+            "doctor_note, created_at",
             "FROM consultation_progress_records",
             "WHERE consultation_id IN",
             "<foreach collection='consultationIds' item='id' open='(' separator=',' close=')'>",

@@ -14,6 +14,5 @@ public class ConsultationProgressRecord {
     private String previousStatus;
     private String status;
     private String doctorNote;
-    private LocalDateTime followUpAt;
     private LocalDateTime createdAt;
 }

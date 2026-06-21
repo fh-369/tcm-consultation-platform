@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 
 import {
@@ -12,6 +12,7 @@ import {
   statusDisplay,
   urgencyDisplay,
 } from '../../features/consultation/display'
+import { getDoctorWorkflow } from '../../features/consultation/workflow'
 
 const loading = ref(false)
 const saving = ref(false)
@@ -27,10 +28,9 @@ const filters = reactive({
   keyword: '',
 })
 const updateForm = reactive({
-  status: '',
   doctorNote: '',
-  followUpAt: '',
 })
+const workflow = computed(() => getDoctorWorkflow(selected.value?.status))
 
 function errorMessage(error, fallback) {
   return error.response?.data?.message || error.message || fallback
@@ -73,24 +73,45 @@ function resetFilters() {
 
 function openDetails(item) {
   selected.value = item
-  updateForm.status = item.status
-  updateForm.doctorNote = item.doctorNote || ''
-  updateForm.followUpAt = item.followUpAt || ''
+  updateForm.doctorNote = ''
   drawerVisible.value = true
 }
 
-async function saveUpdate() {
+async function submitUpdate(payload, successMessage) {
   saving.value = true
   try {
-    const updated = await updateDoctorConsultation(selected.value.id, updateForm)
+    const updated = await updateDoctorConsultation(selected.value.id, payload)
     selected.value = { ...selected.value, ...updated }
-    ElMessage.success('问诊处理结果已保存')
+    updateForm.doctorNote = ''
+    ElMessage.success(successMessage)
     await loadConsultations()
   } catch (error) {
     ElMessage.error(errorMessage(error, '问诊更新失败'))
   } finally {
     saving.value = false
   }
+}
+
+function startConsultation() {
+  submitUpdate({ status: '接诊中' }, '已开始接诊')
+}
+
+function saveReply() {
+  const doctorNote = updateForm.doctorNote.trim()
+  if (!doctorNote) {
+    ElMessage.warning('请先填写本次医生回复')
+    return
+  }
+  submitUpdate({ status: '接诊中', doctorNote }, '医生回复已保存')
+}
+
+function completeConsultation() {
+  const doctorNote = updateForm.doctorNote.trim()
+  if (!doctorNote) {
+    ElMessage.warning('完成问诊前请填写本次医生回复')
+    return
+  }
+  submitUpdate({ status: '已完成', doctorNote }, '问诊已完成')
 }
 
 onMounted(loadConsultations)
@@ -206,7 +227,7 @@ onMounted(loadConsultations)
           <header>
             <div>
               <h3>处理时间线</h3>
-              <p>每次状态、回复和随访安排都会保留。</p>
+              <p>每次状态变化和医生回复都会保留。</p>
             </div>
             <span>{{ selected.progressRecords?.length || 0 }} 条记录</span>
           </header>
@@ -223,23 +244,23 @@ onMounted(loadConsultations)
                   <span>{{ record.previousStatus }} → {{ record.status }}</span>
                 </div>
                 <p v-if="record.doctorNote">{{ record.doctorNote }}</p>
-                <small v-if="record.followUpAt">
-                  随访安排：{{ formatConsultationTime(record.followUpAt) }}
-                </small>
               </article>
             </el-timeline-item>
           </el-timeline>
           <el-empty v-else :image-size="64" description="尚无处理记录" />
         </section>
 
-        <el-form label-position="top">
-          <el-form-item label="处理状态">
-            <el-select v-model="updateForm.status">
-              <el-option label="待接诊" value="待接诊" />
-              <el-option label="接诊中" value="接诊中" />
-              <el-option label="已完成" value="已完成" />
-            </el-select>
-          </el-form-item>
+        <section v-if="workflow.canStart" class="workflow-action start-action">
+          <div>
+            <strong>准备开始接诊</strong>
+            <p>开始后问诊将进入处理中，随后可以逐条追加医生回复。</p>
+          </div>
+          <el-button type="primary" :loading="saving" @click="startConsultation">
+            开始接诊
+          </el-button>
+        </section>
+
+        <el-form v-else-if="workflow.canReply" label-position="top">
           <el-form-item label="医生回复">
             <el-input
               v-model="updateForm.doctorNote"
@@ -250,16 +271,20 @@ onMounted(loadConsultations)
               type="textarea"
             />
           </el-form-item>
-          <el-form-item label="随访时间">
-            <el-date-picker
-              v-model="updateForm.followUpAt"
-              type="datetime"
-              value-format="YYYY-MM-DDTHH:mm:ss"
-              placeholder="可选，安排后续随访时间"
-            />
-          </el-form-item>
-          <el-button type="primary" :loading="saving" @click="saveUpdate">保存处理结果</el-button>
+          <div class="workflow-buttons">
+            <el-button :loading="saving" @click="saveReply">保存回复</el-button>
+            <el-button type="primary" :loading="saving" @click="completeConsultation">
+              完成问诊
+            </el-button>
+          </div>
         </el-form>
+
+        <section v-else class="workflow-action completed-action">
+          <div>
+            <strong>问诊已完成</strong>
+            <p>当前记录仅支持查看，历史回复会继续保留在处理时间线中。</p>
+          </div>
+        </section>
       </div>
     </el-drawer>
   </section>
@@ -486,15 +511,37 @@ dd {
   white-space: pre-wrap;
 }
 
-.progress-entry small {
-  display: block;
-  margin-top: 9px;
-  color: var(--color-cinnabar);
-  font-size: 11px;
+.workflow-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: white;
 }
 
-.el-form :deep(.el-date-editor) {
-  width: 100%;
+.workflow-action strong {
+  color: var(--color-ink);
+  font-size: 16px;
+}
+
+.workflow-action p {
+  margin: 6px 0 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.completed-action {
+  background: var(--color-mist);
+}
+
+.workflow-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 @media (max-width: 900px) {

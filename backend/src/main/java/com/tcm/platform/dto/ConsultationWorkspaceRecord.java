@@ -30,7 +30,6 @@ public class ConsultationWorkspaceRecord {
     private String doctorName;
     private String doctorDepartment;
     private LocalDateTime assignedAt;
-    private LocalDateTime followUpAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private List<ConsultationProgressRecord> progressRecords;

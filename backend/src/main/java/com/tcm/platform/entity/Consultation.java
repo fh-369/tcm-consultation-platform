@@ -56,8 +56,6 @@ public class Consultation {
 
     private LocalDateTime assignedAt;
 
-    private LocalDateTime followUpAt;
-
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 

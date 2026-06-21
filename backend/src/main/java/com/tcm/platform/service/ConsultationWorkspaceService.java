@@ -182,8 +182,9 @@ public class ConsultationWorkspaceService {
             throw new IllegalArgumentException("该问诊单未分配给当前医生");
         }
         validateOptionalStatus(request.getStatus());
+        validateDoctorTransition(consultation, request);
         if (!hasEffectiveUpdate(request, consultation)) {
-            throw new IllegalArgumentException("请至少更新状态、医生回复或随访时间中的一项");
+            throw new IllegalArgumentException("请至少开始接诊或填写一条新的医生回复");
         }
         User doctor = requireActiveDoctor(doctorId);
         String previousStatus = consultation.getStatus();
@@ -191,11 +192,8 @@ public class ConsultationWorkspaceService {
         if (hasText(request.getStatus())) {
             consultation.setStatus(request.getStatus());
         }
-        if (request.getDoctorNote() != null) {
-            consultation.setDoctorNote(request.getDoctorNote());
-        }
-        if (request.getFollowUpAt() != null) {
-            consultation.setFollowUpAt(request.getFollowUpAt());
+        if (hasText(request.getDoctorNote())) {
+            consultation.setDoctorNote(request.getDoctorNote().trim());
         }
         update(consultation);
         ConsultationProgressRecord record = new ConsultationProgressRecord();
@@ -204,8 +202,9 @@ public class ConsultationWorkspaceService {
         record.setDoctorName(doctor.getDisplayName());
         record.setPreviousStatus(previousStatus);
         record.setStatus(consultation.getStatus());
-        record.setDoctorNote(request.getDoctorNote());
-        record.setFollowUpAt(request.getFollowUpAt());
+        record.setDoctorNote(
+                hasText(request.getDoctorNote()) ? request.getDoctorNote().trim() : null
+        );
         if (consultationMapper.insertProgressRecord(record) != 1) {
             throw new IllegalStateException("问诊处理记录保存失败");
         }
@@ -411,10 +410,34 @@ public class ConsultationWorkspaceService {
     ) {
         boolean statusChanged = hasText(request.getStatus())
                 && !Objects.equals(request.getStatus(), consultation.getStatus());
-        boolean noteChanged = request.getDoctorNote() != null
-                && !Objects.equals(request.getDoctorNote(), consultation.getDoctorNote());
-        boolean followUpChanged = request.getFollowUpAt() != null
-                && !Objects.equals(request.getFollowUpAt(), consultation.getFollowUpAt());
-        return statusChanged || noteChanged || followUpChanged;
+        boolean noteChanged = hasText(request.getDoctorNote())
+                && !Objects.equals(request.getDoctorNote().trim(), consultation.getDoctorNote());
+        return statusChanged || noteChanged;
+    }
+
+    private void validateDoctorTransition(
+            Consultation consultation,
+            ConsultationUpdateRequest request
+    ) {
+        String currentStatus = consultation.getStatus();
+        String requestedStatus = hasText(request.getStatus())
+                ? request.getStatus()
+                : currentStatus;
+
+        if (COMPLETED_STATUS.equals(currentStatus)) {
+            throw new IllegalArgumentException("已完成问诊仅支持查看");
+        }
+        if (PENDING_STATUS.equals(currentStatus)
+                && !"接诊中".equals(requestedStatus)) {
+            throw new IllegalArgumentException("待接诊问诊只能开始接诊");
+        }
+        if ("接诊中".equals(currentStatus)
+                && PENDING_STATUS.equals(requestedStatus)) {
+            throw new IllegalArgumentException("接诊中的问诊不能退回待接诊");
+        }
+        if (COMPLETED_STATUS.equals(requestedStatus)
+                && !hasText(request.getDoctorNote())) {
+            throw new IllegalArgumentException("完成问诊前请填写本次医生回复");
+        }
     }
 }

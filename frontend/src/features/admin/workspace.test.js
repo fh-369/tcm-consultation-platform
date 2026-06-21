@@ -47,7 +47,7 @@ describe('admin workspace role configuration', () => {
       badge: '医',
       roleLabel: '医生',
       workspaceLabel: '个人接诊工作台',
-      headline: '问诊处理与随访安排',
+      headline: '问诊接诊与处理记录',
     })
   })
 

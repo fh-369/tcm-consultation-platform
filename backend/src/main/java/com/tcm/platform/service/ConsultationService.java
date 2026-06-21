@@ -153,10 +153,6 @@ public class ConsultationService {
         if (request.getDoctorId() != null) {
             consultation.setDoctorId(request.getDoctorId());
         }
-        if (request.getFollowUpAt() != null) {
-            consultation.setFollowUpAt(request.getFollowUpAt());
-        }
-
         if (consultationMapper.updateById(consultation) != 1) {
             throw new IllegalStateException("更新问诊单失败");
         }

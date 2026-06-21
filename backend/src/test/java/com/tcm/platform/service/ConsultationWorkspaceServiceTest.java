@@ -341,7 +341,6 @@ class ConsultationWorkspaceServiceTest {
         ConsultationUpdateRequest request = new ConsultationUpdateRequest();
         request.setStatus("接诊中");
         request.setDoctorNote("建议先清淡饮食并观察两天。");
-        request.setFollowUpAt(LocalDateTime.of(2026, 6, 25, 9, 0));
 
         Consultation updated = service.updateAsDoctor(9L, request, 6L);
 
@@ -355,10 +354,97 @@ class ConsultationWorkspaceServiceTest {
         assertThat(record.getPreviousStatus()).isEqualTo("待接诊");
         assertThat(record.getStatus()).isEqualTo("接诊中");
         assertThat(record.getDoctorNote()).isEqualTo("建议先清淡饮食并观察两天。");
-        assertThat(record.getFollowUpAt()).isEqualTo(LocalDateTime.of(2026, 6, 25, 9, 0));
         assertThat(updated.getProgressRecords())
                 .extracting(ConsultationProgressRecord::getDoctorNote)
                 .containsExactly("建议先清淡饮食并观察两天。");
+    }
+
+    @Test
+    void doctorStartsPendingConsultationWithoutReply() {
+        ConsultationMapper consultationMapper = mock(ConsultationMapper.class);
+        UserMapper userMapper = mock(UserMapper.class);
+        AccountMapper accountMapper = mock(AccountMapper.class);
+        DepartmentMapper departmentMapper = mock(DepartmentMapper.class);
+        Consultation consultation = consultation(9L, 6L, "待接诊");
+        User doctor = doctor(6L, 16L);
+        Account account = new Account();
+        account.setId(16L);
+        account.setEnabled(true);
+        when(consultationMapper.selectById(9L)).thenReturn(consultation);
+        when(userMapper.selectById(6L)).thenReturn(doctor);
+        when(accountMapper.selectById(16L)).thenReturn(account);
+        when(consultationMapper.updateById(consultation)).thenReturn(1);
+        when(consultationMapper.insertProgressRecord(any(ConsultationProgressRecord.class)))
+                .thenReturn(1);
+        when(consultationMapper.selectProgressRecords(List.of(9L))).thenReturn(List.of());
+        ConsultationWorkspaceService service =
+                new ConsultationWorkspaceService(
+                        consultationMapper, userMapper, accountMapper, departmentMapper
+                );
+        ConsultationUpdateRequest request = new ConsultationUpdateRequest();
+        request.setStatus("接诊中");
+
+        Consultation updated = service.updateAsDoctor(9L, request, 6L);
+
+        assertThat(updated.getStatus()).isEqualTo("接诊中");
+        verify(consultationMapper).insertProgressRecord(any(ConsultationProgressRecord.class));
+    }
+
+    @Test
+    void doctorCannotSkipOrReverseConsultationStatus() {
+        ConsultationMapper consultationMapper = mock(ConsultationMapper.class);
+        UserMapper userMapper = mock(UserMapper.class);
+        AccountMapper accountMapper = mock(AccountMapper.class);
+        DepartmentMapper departmentMapper = mock(DepartmentMapper.class);
+        ConsultationWorkspaceService service =
+                new ConsultationWorkspaceService(
+                        consultationMapper, userMapper, accountMapper, departmentMapper
+                );
+        Consultation pending = consultation(9L, 6L, "待接诊");
+        ConsultationUpdateRequest complete = new ConsultationUpdateRequest();
+        complete.setStatus("已完成");
+        complete.setDoctorNote("处理完成");
+        when(consultationMapper.selectById(9L)).thenReturn(pending);
+
+        assertThatThrownBy(() -> service.updateAsDoctor(9L, complete, 6L))
+                .hasMessage("待接诊问诊只能开始接诊");
+
+        Consultation active = consultation(10L, 6L, "接诊中");
+        ConsultationUpdateRequest reverse = new ConsultationUpdateRequest();
+        reverse.setStatus("待接诊");
+        when(consultationMapper.selectById(10L)).thenReturn(active);
+
+        assertThatThrownBy(() -> service.updateAsDoctor(10L, reverse, 6L))
+                .hasMessage("接诊中的问诊不能退回待接诊");
+        verify(consultationMapper, never()).updateById(any());
+    }
+
+    @Test
+    void completingConsultationRequiresNewReplyAndCompletedRecordIsReadOnly() {
+        ConsultationMapper consultationMapper = mock(ConsultationMapper.class);
+        UserMapper userMapper = mock(UserMapper.class);
+        AccountMapper accountMapper = mock(AccountMapper.class);
+        DepartmentMapper departmentMapper = mock(DepartmentMapper.class);
+        ConsultationWorkspaceService service =
+                new ConsultationWorkspaceService(
+                        consultationMapper, userMapper, accountMapper, departmentMapper
+                );
+        Consultation active = consultation(9L, 6L, "接诊中");
+        when(consultationMapper.selectById(9L)).thenReturn(active);
+        ConsultationUpdateRequest noReply = new ConsultationUpdateRequest();
+        noReply.setStatus("已完成");
+
+        assertThatThrownBy(() -> service.updateAsDoctor(9L, noReply, 6L))
+                .hasMessage("完成问诊前请填写本次医生回复");
+
+        Consultation completed = consultation(10L, 6L, "已完成");
+        when(consultationMapper.selectById(10L)).thenReturn(completed);
+        ConsultationUpdateRequest update = new ConsultationUpdateRequest();
+        update.setDoctorNote("继续补充");
+
+        assertThatThrownBy(() -> service.updateAsDoctor(10L, update, 6L))
+                .hasMessage("已完成问诊仅支持查看");
+        verify(consultationMapper, never()).updateById(any());
     }
 
     @Test
@@ -378,7 +464,7 @@ class ConsultationWorkspaceServiceTest {
                 service.updateAsDoctor(9L, new ConsultationUpdateRequest(), 6L)
         )
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("请至少更新状态、医生回复或随访时间中的一项");
+                .hasMessage("请至少开始接诊或填写一条新的医生回复");
 
         verify(consultationMapper, never()).updateById(any());
         verify(consultationMapper, never()).insertProgressRecord(any());

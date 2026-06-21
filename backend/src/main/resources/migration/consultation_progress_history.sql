@@ -8,7 +8,6 @@ CREATE TABLE consultation_progress_records (
     previous_status VARCHAR(20) NOT NULL COMMENT '更新前状态',
     status VARCHAR(20) NOT NULL COMMENT '更新后状态',
     doctor_note TEXT COMMENT '本次医生回复',
-    follow_up_at DATETIME COMMENT '本次设定随访时间',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '记录时间',
     INDEX idx_progress_consultation (consultation_id),
     INDEX idx_progress_created_at (created_at),

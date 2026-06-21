@@ -148,9 +148,6 @@ onMounted(loadConsultations)
                   </div>
                   <small>{{ record.previousStatus }} → {{ record.status }}</small>
                   <p v-if="record.doctorNote">{{ record.doctorNote }}</p>
-                  <em v-if="record.followUpAt">
-                    随访安排：{{ formatConsultationTime(record.followUpAt) }}
-                  </em>
                 </li>
               </ol>
               <p v-else>{{ item.doctorNote || '医生暂未回复，请耐心等待。' }}</p>
@@ -533,14 +530,6 @@ dd {
   white-space: pre-wrap;
 }
 
-.patient-timeline em {
-  display: block;
-  margin-top: 7px;
-  color: var(--color-cinnabar);
-  font-size: 11px;
-  font-style: normal;
-  font-weight: 700;
-}
 
 .el-pagination {
   justify-content: center;
