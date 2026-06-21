@@ -8,6 +8,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcm.platform.dto.ConsultationUpdateRequest;
 import com.tcm.platform.entity.Account;
 import com.tcm.platform.entity.Consultation;
+import com.tcm.platform.entity.ConsultationProgressRecord;
 import com.tcm.platform.entity.Department;
 import com.tcm.platform.entity.User;
 import com.tcm.platform.mapper.AccountMapper;
@@ -20,6 +21,7 @@ import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.mockito.ArgumentCaptor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -101,6 +103,51 @@ class ConsultationWorkspaceServiceTest {
         assertThat(queryCaptor.getValue().getCustomSqlSegment())
                 .contains("doctor_id", "status")
                 .doesNotContain("doctor_id IS NULL");
+    }
+
+    @Test
+    void myConsultationsIncludeChronologicalProgressRecords() {
+        ConsultationMapper consultationMapper = mock(ConsultationMapper.class);
+        UserMapper userMapper = mock(UserMapper.class);
+        AccountMapper accountMapper = mock(AccountMapper.class);
+        DepartmentMapper departmentMapper = mock(DepartmentMapper.class);
+        User doctor = doctor(6L, 16L);
+        Account account = new Account();
+        account.setId(16L);
+        account.setEnabled(true);
+        Consultation consultation = consultation(9L, 6L, "接诊中");
+        consultation.setDepartmentId(2L);
+        Page<Consultation> page = new Page<>(1, 10, 1);
+        page.setRecords(List.of(consultation));
+        ConsultationProgressRecord first = new ConsultationProgressRecord();
+        first.setId(1L);
+        first.setConsultationId(9L);
+        first.setDoctorNote("首次回复");
+        ConsultationProgressRecord second = new ConsultationProgressRecord();
+        second.setId(2L);
+        second.setConsultationId(9L);
+        second.setDoctorNote("复诊回复");
+        when(userMapper.selectById(6L)).thenReturn(doctor);
+        when(accountMapper.selectById(16L)).thenReturn(account);
+        when(consultationMapper.selectPage(any(IPage.class), any(LambdaQueryWrapper.class)))
+                .thenReturn(page);
+        when(consultationMapper.selectProgressRecords(List.of(9L)))
+                .thenReturn(List.of(first, second));
+        when(userMapper.selectBatchIds(any())).thenReturn(List.of(doctor));
+        when(departmentMapper.selectBatchIds(any()))
+                .thenReturn(List.of(department(2L, "internal-medicine", "中医内科")));
+        ConsultationWorkspaceService service =
+                new ConsultationWorkspaceService(
+                        consultationMapper, userMapper, accountMapper, departmentMapper
+                );
+
+        Page<com.tcm.platform.dto.ConsultationWorkspaceRecord> result =
+                service.listMine(1, 10, null, null, null, 6L);
+
+        assertThat(result.getRecords()).hasSize(1);
+        assertThat(result.getRecords().get(0).getProgressRecords())
+                .extracting(ConsultationProgressRecord::getDoctorNote)
+                .containsExactly("首次回复", "复诊回复");
     }
 
     @Test
@@ -262,6 +309,79 @@ class ConsultationWorkspaceServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("该问诊单未分配给当前医生");
         verify(consultationMapper, never()).deleteById(any(Long.class));
+    }
+
+    @Test
+    void doctorUpdateAppendsProgressRecordWithPreviousAndCurrentStatus() {
+        ConsultationMapper consultationMapper = mock(ConsultationMapper.class);
+        UserMapper userMapper = mock(UserMapper.class);
+        AccountMapper accountMapper = mock(AccountMapper.class);
+        DepartmentMapper departmentMapper = mock(DepartmentMapper.class);
+        Consultation consultation = consultation(9L, 6L, "待接诊");
+        User doctor = doctor(6L, 16L);
+        Account account = new Account();
+        account.setId(16L);
+        account.setEnabled(true);
+        when(consultationMapper.selectById(9L)).thenReturn(consultation);
+        when(userMapper.selectById(6L)).thenReturn(doctor);
+        when(accountMapper.selectById(16L)).thenReturn(account);
+        when(consultationMapper.updateById(consultation)).thenReturn(1);
+        when(consultationMapper.insertProgressRecord(any(ConsultationProgressRecord.class)))
+                .thenReturn(1);
+        ConsultationProgressRecord persistedRecord = new ConsultationProgressRecord();
+        persistedRecord.setId(1L);
+        persistedRecord.setConsultationId(9L);
+        persistedRecord.setDoctorNote("建议先清淡饮食并观察两天。");
+        when(consultationMapper.selectProgressRecords(List.of(9L)))
+                .thenReturn(List.of(persistedRecord));
+        ConsultationWorkspaceService service =
+                new ConsultationWorkspaceService(
+                        consultationMapper, userMapper, accountMapper, departmentMapper
+                );
+        ConsultationUpdateRequest request = new ConsultationUpdateRequest();
+        request.setStatus("接诊中");
+        request.setDoctorNote("建议先清淡饮食并观察两天。");
+        request.setFollowUpAt(LocalDateTime.of(2026, 6, 25, 9, 0));
+
+        Consultation updated = service.updateAsDoctor(9L, request, 6L);
+
+        ArgumentCaptor<ConsultationProgressRecord> recordCaptor =
+                ArgumentCaptor.forClass(ConsultationProgressRecord.class);
+        verify(consultationMapper).insertProgressRecord(recordCaptor.capture());
+        ConsultationProgressRecord record = recordCaptor.getValue();
+        assertThat(record.getConsultationId()).isEqualTo(9L);
+        assertThat(record.getDoctorId()).isEqualTo(6L);
+        assertThat(record.getDoctorName()).isEqualTo("张医生");
+        assertThat(record.getPreviousStatus()).isEqualTo("待接诊");
+        assertThat(record.getStatus()).isEqualTo("接诊中");
+        assertThat(record.getDoctorNote()).isEqualTo("建议先清淡饮食并观察两天。");
+        assertThat(record.getFollowUpAt()).isEqualTo(LocalDateTime.of(2026, 6, 25, 9, 0));
+        assertThat(updated.getProgressRecords())
+                .extracting(ConsultationProgressRecord::getDoctorNote)
+                .containsExactly("建议先清淡饮食并观察两天。");
+    }
+
+    @Test
+    void doctorUpdateRejectsRequestWithoutEffectiveChanges() {
+        ConsultationMapper consultationMapper = mock(ConsultationMapper.class);
+        UserMapper userMapper = mock(UserMapper.class);
+        AccountMapper accountMapper = mock(AccountMapper.class);
+        DepartmentMapper departmentMapper = mock(DepartmentMapper.class);
+        Consultation consultation = consultation(9L, 6L, "接诊中");
+        when(consultationMapper.selectById(9L)).thenReturn(consultation);
+        ConsultationWorkspaceService service =
+                new ConsultationWorkspaceService(
+                        consultationMapper, userMapper, accountMapper, departmentMapper
+                );
+
+        assertThatThrownBy(() ->
+                service.updateAsDoctor(9L, new ConsultationUpdateRequest(), 6L)
+        )
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("请至少更新状态、医生回复或随访时间中的一项");
+
+        verify(consultationMapper, never()).updateById(any());
+        verify(consultationMapper, never()).insertProgressRecord(any());
     }
 
     @Test

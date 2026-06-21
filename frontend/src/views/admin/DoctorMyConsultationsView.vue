@@ -29,6 +29,7 @@ const filters = reactive({
 const updateForm = reactive({
   status: '',
   doctorNote: '',
+  followUpAt: '',
 })
 
 function errorMessage(error, fallback) {
@@ -74,6 +75,7 @@ function openDetails(item) {
   selected.value = item
   updateForm.status = item.status
   updateForm.doctorNote = item.doctorNote || ''
+  updateForm.followUpAt = item.followUpAt || ''
   drawerVisible.value = true
 }
 
@@ -200,6 +202,36 @@ onMounted(loadConsultations)
           <div><dt>患者备注</dt><dd>{{ selected.patientNote || '未填' }}</dd></div>
         </dl>
 
+        <section class="progress-panel">
+          <header>
+            <div>
+              <h3>处理时间线</h3>
+              <p>每次状态、回复和随访安排都会保留。</p>
+            </div>
+            <span>{{ selected.progressRecords?.length || 0 }} 条记录</span>
+          </header>
+          <el-timeline v-if="selected.progressRecords?.length">
+            <el-timeline-item
+              v-for="record in selected.progressRecords"
+              :key="record.id"
+              :timestamp="formatConsultationTime(record.createdAt)"
+              placement="top"
+            >
+              <article class="progress-entry">
+                <div class="progress-entry-heading">
+                  <strong>{{ record.doctorName || '接诊医生' }}</strong>
+                  <span>{{ record.previousStatus }} → {{ record.status }}</span>
+                </div>
+                <p v-if="record.doctorNote">{{ record.doctorNote }}</p>
+                <small v-if="record.followUpAt">
+                  随访安排：{{ formatConsultationTime(record.followUpAt) }}
+                </small>
+              </article>
+            </el-timeline-item>
+          </el-timeline>
+          <el-empty v-else :image-size="64" description="尚无处理记录" />
+        </section>
+
         <el-form label-position="top">
           <el-form-item label="处理状态">
             <el-select v-model="updateForm.status">
@@ -216,6 +248,14 @@ onMounted(loadConsultations)
               show-word-limit
               placeholder="填写患者可以看到的处理说明"
               type="textarea"
+            />
+          </el-form-item>
+          <el-form-item label="随访时间">
+            <el-date-picker
+              v-model="updateForm.followUpAt"
+              type="datetime"
+              value-format="YYYY-MM-DDTHH:mm:ss"
+              placeholder="可选，安排后续随访时间"
             />
           </el-form-item>
           <el-button type="primary" :loading="saving" @click="saveUpdate">保存处理结果</el-button>
@@ -385,6 +425,76 @@ dd {
   margin: 6px 0 0;
   font-size: 12px;
   line-height: 1.6;
+}
+
+.progress-panel {
+  margin: 20px 0;
+  padding: 18px;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: #f8fbf9;
+}
+
+.progress-panel > header,
+.progress-entry-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.progress-panel h3 {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 18px;
+}
+
+.progress-panel header p {
+  margin: 5px 0 0;
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.progress-panel header > span,
+.progress-entry-heading span {
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.progress-panel :deep(.el-timeline) {
+  margin-top: 20px;
+  padding-left: 5px;
+}
+
+.progress-entry {
+  padding: 14px;
+  border: 1px solid rgb(47 95 72 / 10%);
+  border-radius: 14px;
+  background: white;
+}
+
+.progress-entry strong {
+  color: var(--color-ink);
+  font-size: 13px;
+}
+
+.progress-entry p {
+  margin: 10px 0 0;
+  color: #365a49;
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.progress-entry small {
+  display: block;
+  margin-top: 9px;
+  color: var(--color-cinnabar);
+  font-size: 11px;
+}
+
+.el-form :deep(.el-date-editor) {
+  width: 100%;
 }
 
 @media (max-width: 900px) {

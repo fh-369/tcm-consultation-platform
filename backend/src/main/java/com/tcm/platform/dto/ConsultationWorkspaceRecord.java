@@ -1,8 +1,10 @@
 package com.tcm.platform.dto;
 
 import lombok.Data;
+import com.tcm.platform.entity.ConsultationProgressRecord;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 public class ConsultationWorkspaceRecord {
@@ -31,4 +33,5 @@ public class ConsultationWorkspaceRecord {
     private LocalDateTime followUpAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private List<ConsultationProgressRecord> progressRecords;
 }

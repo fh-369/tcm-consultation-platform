@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcm.platform.dto.ConsultationRequest;
 import com.tcm.platform.dto.ConsultationUpdateRequest;
 import com.tcm.platform.entity.Consultation;
+import com.tcm.platform.entity.ConsultationProgressRecord;
 import com.tcm.platform.entity.Department;
 import com.tcm.platform.mapper.ConsultationMapper;
 import com.tcm.platform.mapper.DepartmentMapper;
@@ -111,6 +112,7 @@ public class ConsultationService {
 
         Page<Consultation> page = consultationMapper.selectPage(new Page<>(current, size), query);
         attachDepartmentNames(page.getRecords());
+        attachProgressRecords(page.getRecords());
         return page;
     }
 
@@ -236,5 +238,29 @@ public class ConsultationService {
             Department department = departments.get(consultation.getDepartmentId());
             consultation.setDepartmentName(department == null ? null : department.getName());
         });
+    }
+
+    private void attachProgressRecords(List<Consultation> consultations) {
+        List<Long> consultationIds = consultations.stream()
+                .map(Consultation::getId)
+                .filter(Objects::nonNull)
+                .toList();
+        if (consultationIds.isEmpty()) {
+            return;
+        }
+        Map<Long, List<ConsultationProgressRecord>> recordsByConsultation =
+                consultationMapper.selectProgressRecords(consultationIds).stream()
+                        .collect(Collectors.groupingBy(
+                                ConsultationProgressRecord::getConsultationId,
+                                Collectors.toList()
+                        ));
+        consultations.forEach(consultation ->
+                consultation.setProgressRecords(
+                        recordsByConsultation.getOrDefault(
+                                consultation.getId(),
+                                Collections.emptyList()
+                        )
+                )
+        );
     }
 }

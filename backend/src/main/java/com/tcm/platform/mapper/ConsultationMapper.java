@@ -2,6 +2,8 @@ package com.tcm.platform.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.tcm.platform.entity.Consultation;
+import com.tcm.platform.entity.ConsultationProgressRecord;
+import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -12,6 +14,43 @@ import java.util.Map;
 
 @Mapper
 public interface ConsultationMapper extends BaseMapper<Consultation> {
+
+    @Insert("""
+            INSERT INTO consultation_progress_records (
+                consultation_id,
+                doctor_id,
+                doctor_name,
+                previous_status,
+                status,
+                doctor_note,
+                follow_up_at
+            ) VALUES (
+                #{consultationId},
+                #{doctorId},
+                #{doctorName},
+                #{previousStatus},
+                #{status},
+                #{doctorNote},
+                #{followUpAt}
+            )
+            """)
+    int insertProgressRecord(ConsultationProgressRecord record);
+
+    @Select({
+            "<script>",
+            "SELECT id, consultation_id, doctor_id, doctor_name, previous_status, status,",
+            "doctor_note, follow_up_at, created_at",
+            "FROM consultation_progress_records",
+            "WHERE consultation_id IN",
+            "<foreach collection='consultationIds' item='id' open='(' separator=',' close=')'>",
+            "#{id}",
+            "</foreach>",
+            "ORDER BY created_at ASC, id ASC",
+            "</script>"
+    })
+    List<ConsultationProgressRecord> selectProgressRecords(
+            @Param("consultationIds") List<Long> consultationIds
+    );
 
     @Update("""
             UPDATE consultations

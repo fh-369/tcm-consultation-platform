@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcm.platform.entity.Consultation;
+import com.tcm.platform.entity.ConsultationProgressRecord;
 import com.tcm.platform.entity.Department;
 import com.tcm.platform.dto.ConsultationRequest;
 import com.tcm.platform.dto.ConsultationUpdateRequest;
@@ -18,6 +19,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -64,6 +67,30 @@ class ConsultationServiceTest {
 
         String sql = queryCaptor.getValue().getCustomSqlSegment();
         assertThat(sql).contains("patient_name", "symptoms", "OR");
+    }
+
+    @Test
+    void patientConsultationsIncludeProgressRecords() {
+        ConsultationService service = service();
+        Consultation consultation = new Consultation();
+        consultation.setId(7L);
+        consultation.setPatientAccountId(8L);
+        Page<Consultation> page = new Page<>(1, 10, 1);
+        page.setRecords(List.of(consultation));
+        ConsultationProgressRecord record = new ConsultationProgressRecord();
+        record.setConsultationId(7L);
+        record.setDoctorNote("请三天后反馈恢复情况。");
+        when(consultationMapper.selectPage(any(IPage.class), any(LambdaQueryWrapper.class)))
+                .thenReturn(page);
+        when(consultationMapper.selectProgressRecords(List.of(7L)))
+                .thenReturn(List.of(record));
+
+        Page<Consultation> result =
+                service.listConsultations(1, 10, null, null, 8L, null);
+
+        assertThat(result.getRecords().get(0).getProgressRecords())
+                .extracting(ConsultationProgressRecord::getDoctorNote)
+                .containsExactly("请三天后反馈恢复情况。");
     }
 
     @Test

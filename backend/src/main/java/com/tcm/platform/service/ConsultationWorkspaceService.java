@@ -6,6 +6,7 @@ import com.tcm.platform.dto.ConsultationUpdateRequest;
 import com.tcm.platform.dto.ConsultationWorkspaceRecord;
 import com.tcm.platform.entity.Account;
 import com.tcm.platform.entity.Consultation;
+import com.tcm.platform.entity.ConsultationProgressRecord;
 import com.tcm.platform.entity.Department;
 import com.tcm.platform.entity.User;
 import com.tcm.platform.mapper.AccountMapper;
@@ -181,6 +182,11 @@ public class ConsultationWorkspaceService {
             throw new IllegalArgumentException("该问诊单未分配给当前医生");
         }
         validateOptionalStatus(request.getStatus());
+        if (!hasEffectiveUpdate(request, consultation)) {
+            throw new IllegalArgumentException("请至少更新状态、医生回复或随访时间中的一项");
+        }
+        User doctor = requireActiveDoctor(doctorId);
+        String previousStatus = consultation.getStatus();
 
         if (hasText(request.getStatus())) {
             consultation.setStatus(request.getStatus());
@@ -192,6 +198,20 @@ public class ConsultationWorkspaceService {
             consultation.setFollowUpAt(request.getFollowUpAt());
         }
         update(consultation);
+        ConsultationProgressRecord record = new ConsultationProgressRecord();
+        record.setConsultationId(consultationId);
+        record.setDoctorId(doctorId);
+        record.setDoctorName(doctor.getDisplayName());
+        record.setPreviousStatus(previousStatus);
+        record.setStatus(consultation.getStatus());
+        record.setDoctorNote(request.getDoctorNote());
+        record.setFollowUpAt(request.getFollowUpAt());
+        if (consultationMapper.insertProgressRecord(record) != 1) {
+            throw new IllegalStateException("问诊处理记录保存失败");
+        }
+        consultation.setProgressRecords(
+                consultationMapper.selectProgressRecords(List.of(consultationId))
+        );
         return consultation;
     }
 
@@ -243,12 +263,25 @@ public class ConsultationWorkspaceService {
                 ? Collections.emptyMap()
                 : departmentMapper.selectBatchIds(departmentIds).stream()
                         .collect(Collectors.toMap(Department::getId, Function.identity()));
+        List<Long> consultationIds = page.getRecords().stream()
+                .map(Consultation::getId)
+                .filter(Objects::nonNull)
+                .toList();
+        Map<Long, List<ConsultationProgressRecord>> progressRecords =
+                consultationIds.isEmpty()
+                        ? Collections.emptyMap()
+                        : consultationMapper.selectProgressRecords(consultationIds).stream()
+                                .collect(Collectors.groupingBy(
+                                        ConsultationProgressRecord::getConsultationId,
+                                        Collectors.toList()
+                                ));
 
         List<ConsultationWorkspaceRecord> records = page.getRecords().stream()
                 .map(item -> toRecord(
                         item,
                         doctors.get(item.getDoctorId()),
-                        departments.get(item.getDepartmentId())
+                        departments.get(item.getDepartmentId()),
+                        progressRecords.getOrDefault(item.getId(), Collections.emptyList())
                 ))
                 .toList();
         Page<ConsultationWorkspaceRecord> result = new Page<>(current, size, page.getTotal());
@@ -259,10 +292,12 @@ public class ConsultationWorkspaceService {
     private ConsultationWorkspaceRecord toRecord(
             Consultation consultation,
             User doctor,
-            Department department
+            Department department,
+            List<ConsultationProgressRecord> progressRecords
     ) {
         ConsultationWorkspaceRecord record = new ConsultationWorkspaceRecord();
         BeanUtils.copyProperties(consultation, record);
+        record.setProgressRecords(progressRecords);
         if (department != null) {
             record.setDepartmentName(department.getName());
         }
@@ -368,5 +403,18 @@ public class ConsultationWorkspaceService {
 
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private boolean hasEffectiveUpdate(
+            ConsultationUpdateRequest request,
+            Consultation consultation
+    ) {
+        boolean statusChanged = hasText(request.getStatus())
+                && !Objects.equals(request.getStatus(), consultation.getStatus());
+        boolean noteChanged = request.getDoctorNote() != null
+                && !Objects.equals(request.getDoctorNote(), consultation.getDoctorNote());
+        boolean followUpChanged = request.getFollowUpAt() != null
+                && !Objects.equals(request.getFollowUpAt(), consultation.getFollowUpAt());
+        return statusChanged || noteChanged || followUpChanged;
     }
 }

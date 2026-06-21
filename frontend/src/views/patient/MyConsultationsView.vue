@@ -132,9 +132,28 @@ onMounted(loadConsultations)
               <strong><el-icon><Bell /></el-icon>系统提醒</strong>
               <p>{{ item.reminderText || '暂无系统提醒' }}</p>
             </div>
-            <div :class="['feedback-block', 'doctor-feedback', { 'has-reply': item.doctorNote }]">
-              <strong>医生回复</strong>
-              <p>{{ item.doctorNote || '医生暂未回复，请耐心等待。' }}</p>
+            <div
+              :class="[
+                'feedback-block',
+                'doctor-feedback',
+                { 'has-reply': item.progressRecords?.length || item.doctorNote },
+              ]"
+            >
+              <strong>处理进度</strong>
+              <ol v-if="item.progressRecords?.length" class="patient-timeline">
+                <li v-for="record in item.progressRecords" :key="record.id">
+                  <div>
+                    <span>{{ record.doctorName || '接诊医生' }}</span>
+                    <time>{{ formatConsultationTime(record.createdAt) }}</time>
+                  </div>
+                  <small>{{ record.previousStatus }} → {{ record.status }}</small>
+                  <p v-if="record.doctorNote">{{ record.doctorNote }}</p>
+                  <em v-if="record.followUpAt">
+                    随访安排：{{ formatConsultationTime(record.followUpAt) }}
+                  </em>
+                </li>
+              </ol>
+              <p v-else>{{ item.doctorNote || '医生暂未回复，请耐心等待。' }}</p>
             </div>
           </section>
         </div>
@@ -456,6 +475,71 @@ dd {
 
 .doctor-feedback.has-reply strong {
   color: var(--color-cinnabar);
+}
+
+.patient-timeline {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.patient-timeline li {
+  position: relative;
+  padding: 12px 12px 12px 17px;
+  border: 1px solid rgb(198 89 69 / 12%);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 78%);
+}
+
+.patient-timeline li::before {
+  position: absolute;
+  top: 17px;
+  left: 7px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-cinnabar);
+  content: "";
+}
+
+.patient-timeline div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.patient-timeline span {
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.patient-timeline time,
+.patient-timeline small {
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.patient-timeline small {
+  display: block;
+  margin-top: 5px;
+}
+
+.patient-timeline p {
+  margin-top: 8px;
+  white-space: pre-wrap;
+}
+
+.patient-timeline em {
+  display: block;
+  margin-top: 7px;
+  color: var(--color-cinnabar);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
 }
 
 .el-pagination {
