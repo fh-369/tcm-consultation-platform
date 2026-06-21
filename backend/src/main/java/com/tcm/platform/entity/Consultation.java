@@ -50,6 +50,8 @@ public class Consultation {
 
     private Long doctorId;
 
+    private LocalDateTime assignedAt;
+
     private LocalDateTime followUpAt;
 
     @TableField(fill = FieldFill.INSERT)

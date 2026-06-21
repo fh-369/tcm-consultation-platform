@@ -16,6 +16,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -137,6 +138,7 @@ public class ConsultationWorkspaceService {
             }
             consultation.setDoctorId(doctorId);
             consultation.setStatus(PENDING_STATUS);
+            consultation.setAssignedAt(doctorId == null ? null : LocalDateTime.now());
         }
         return consultation;
     }
@@ -158,7 +160,11 @@ public class ConsultationWorkspaceService {
         }
 
         if (consultationMapper.claimIfUnassigned(consultationId, doctorId) == 1) {
-            return requireConsultation(consultationId);
+            Consultation claimed = requireConsultation(consultationId);
+            if (claimed.getAssignedAt() == null) {
+                claimed.setAssignedAt(LocalDateTime.now());
+            }
+            return claimed;
         }
 
         throw new IllegalArgumentException("该问诊单已被其他医生认领");
@@ -211,6 +217,7 @@ public class ConsultationWorkspaceService {
         consultation.setDepartmentName(department.getName());
         consultation.setDoctorId(null);
         consultation.setStatus(PENDING_STATUS);
+        consultation.setAssignedAt(null);
         return consultation;
     }
 

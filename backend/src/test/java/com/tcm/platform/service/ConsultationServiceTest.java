@@ -22,6 +22,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
@@ -46,6 +47,9 @@ class ConsultationServiceTest {
     @Mock
     private DepartmentMapper departmentMapper;
 
+    @Mock
+    private AutoAssignmentService autoAssignmentService;
+
     @Test
     void listConsultationsSearchesPatientNameOrSymptomsByKeyword() {
         ConsultationService service = service();
@@ -65,8 +69,9 @@ class ConsultationServiceTest {
     @Test
     void createConsultationAppliesDefaultsAndReminderBeforeInsert() {
         ConsultationService service = service();
+        Department department = department(2L, true);
         when(consultationMapper.insert(any(Consultation.class))).thenReturn(1);
-        when(departmentMapper.selectById(2L)).thenReturn(department(2L, true));
+        when(departmentMapper.selectById(2L)).thenReturn(department);
         ConsultationRequest request = consultationRequest(null);
 
         Consultation created = service.createConsultation(request);
@@ -77,6 +82,25 @@ class ConsultationServiceTest {
         assertThat(created.getPatientName()).isEqualTo("李女士");
         verify(reminderService).applyReminder(created);
         verify(consultationMapper).insert(created);
+        verify(autoAssignmentService).tryAssign(created, department);
+    }
+
+    @Test
+    void createConsultationSucceedsWhenAutomaticAssignmentFails() {
+        ConsultationService service = service();
+        Department department = department(2L, true);
+        when(consultationMapper.insert(any(Consultation.class))).thenReturn(1);
+        when(departmentMapper.selectById(2L)).thenReturn(department);
+        doThrow(new IllegalStateException("temporary assignment failure"))
+                .when(autoAssignmentService)
+                .tryAssign(any(Consultation.class), any(Department.class));
+
+        Consultation created = service.createConsultation(consultationRequest("普通"));
+
+        assertThat(created.getPatientName()).isEqualTo("李女士");
+        assertThat(created.getDoctorId()).isNull();
+        verify(consultationMapper).insert(created);
+        verify(autoAssignmentService).tryAssign(created, department);
     }
 
     @Test
@@ -182,12 +206,18 @@ class ConsultationServiceTest {
     }
 
     private ConsultationService service() {
-        return new ConsultationService(consultationMapper, departmentMapper, reminderService);
+        return new ConsultationService(
+                consultationMapper,
+                departmentMapper,
+                reminderService,
+                autoAssignmentService
+        );
     }
 
     private Department department(Long id, boolean enabled) {
         Department department = new Department();
         department.setId(id);
+        department.setCode("internal-medicine");
         department.setName("中医内科");
         department.setEnabled(enabled);
         return department;

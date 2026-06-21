@@ -8,6 +8,8 @@ import com.tcm.platform.entity.Consultation;
 import com.tcm.platform.entity.Department;
 import com.tcm.platform.mapper.ConsultationMapper;
 import com.tcm.platform.mapper.DepartmentMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +27,7 @@ import java.util.stream.Collectors;
 @Service
 public class ConsultationService {
 
+    private static final Logger log = LoggerFactory.getLogger(ConsultationService.class);
     private static final String DEFAULT_URGENCY = "普通";
     private static final String INITIAL_STATUS = "待接诊";
     private static final Set<String> VALID_URGENCIES = Set.of("普通", "紧急", "非常紧急");
@@ -33,15 +36,18 @@ public class ConsultationService {
     private final ConsultationMapper consultationMapper;
     private final DepartmentMapper departmentMapper;
     private final ReminderService reminderService;
+    private final AutoAssignmentService autoAssignmentService;
 
     public ConsultationService(
             ConsultationMapper consultationMapper,
             DepartmentMapper departmentMapper,
-            ReminderService reminderService
+            ReminderService reminderService,
+            AutoAssignmentService autoAssignmentService
     ) {
         this.consultationMapper = consultationMapper;
         this.departmentMapper = departmentMapper;
         this.reminderService = reminderService;
+        this.autoAssignmentService = autoAssignmentService;
     }
 
     @Transactional
@@ -68,6 +74,15 @@ public class ConsultationService {
 
         if (consultationMapper.insert(consultation) != 1) {
             throw new IllegalStateException("创建问诊单失败");
+        }
+        try {
+            autoAssignmentService.tryAssign(consultation, department);
+        } catch (RuntimeException exception) {
+            log.warn(
+                    "Automatic assignment failed for consultation {}: {}",
+                    consultation.getId(),
+                    exception.getMessage()
+            );
         }
         return consultation;
     }

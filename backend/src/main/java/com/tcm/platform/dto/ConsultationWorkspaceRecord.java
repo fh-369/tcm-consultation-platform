@@ -27,6 +27,7 @@ public class ConsultationWorkspaceRecord {
     private Long doctorId;
     private String doctorName;
     private String doctorDepartment;
+    private LocalDateTime assignedAt;
     private LocalDateTime followUpAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

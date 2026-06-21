@@ -19,6 +19,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.mockito.ArgumentCaptor;
 
+import java.time.LocalDateTime;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -128,6 +130,7 @@ class ConsultationWorkspaceServiceTest {
 
         assertThat(assigned.getDoctorId()).isEqualTo(6L);
         assertThat(assigned.getStatus()).isEqualTo("待接诊");
+        assertThat(assigned.getAssignedAt()).isNotNull();
         verify(consultationMapper).updateAssignment(9L, 6L, "待接诊");
     }
 
@@ -200,6 +203,7 @@ class ConsultationWorkspaceServiceTest {
         AccountMapper accountMapper = mock(AccountMapper.class);
         DepartmentMapper departmentMapper = mock(DepartmentMapper.class);
         Consultation consultation = consultation(9L, 6L, "接诊中");
+        consultation.setAssignedAt(LocalDateTime.now().minusDays(1));
         when(consultationMapper.selectById(9L)).thenReturn(consultation);
         when(consultationMapper.updateAssignment(9L, null, "待接诊")).thenReturn(1);
         ConsultationWorkspaceService service =
@@ -211,6 +215,7 @@ class ConsultationWorkspaceServiceTest {
 
         assertThat(unassigned.getDoctorId()).isNull();
         assertThat(unassigned.getStatus()).isEqualTo("待接诊");
+        assertThat(unassigned.getAssignedAt()).isNull();
         verify(consultationMapper).updateAssignment(9L, null, "待接诊");
     }
 
@@ -246,6 +251,7 @@ class ConsultationWorkspaceServiceTest {
 
         assertThat(claimed.getDoctorId()).isEqualTo(6L);
         assertThat(claimed.getStatus()).isEqualTo("待接诊");
+        assertThat(claimed.getAssignedAt()).isNotNull();
 
         Consultation otherDoctors = consultation(10L, 7L, "接诊中");
         when(consultationMapper.selectById(10L)).thenReturn(otherDoctors);
@@ -345,6 +351,7 @@ class ConsultationWorkspaceServiceTest {
 
         Consultation consultation = consultation(9L, 6L, "接诊中");
         consultation.setDepartmentId(1L);
+        consultation.setAssignedAt(LocalDateTime.now().minusDays(1));
         Department department = department(3L, "gynecology", "中医妇科");
         when(consultationMapper.selectById(9L)).thenReturn(consultation);
         when(departmentMapper.selectById(3L)).thenReturn(department);
@@ -356,6 +363,7 @@ class ConsultationWorkspaceServiceTest {
         assertThat(updated.getDepartmentId()).isEqualTo(3L);
         assertThat(updated.getDoctorId()).isNull();
         assertThat(updated.getStatus()).isEqualTo("待接诊");
+        assertThat(updated.getAssignedAt()).isNull();
         verify(consultationMapper).updateDepartmentAndClearAssignment(9L, 3L, "待接诊");
     }
 

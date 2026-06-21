@@ -17,6 +17,7 @@ public interface ConsultationMapper extends BaseMapper<Consultation> {
             UPDATE consultations
             SET doctor_id = #{doctorId},
                 status = #{status},
+                assigned_at = CASE WHEN #{doctorId} IS NULL THEN NULL ELSE CURRENT_TIMESTAMP END,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = #{consultationId}
             """)
@@ -30,6 +31,7 @@ public interface ConsultationMapper extends BaseMapper<Consultation> {
             UPDATE consultations
             SET doctor_id = #{doctorId},
                 status = '待接诊',
+                assigned_at = CURRENT_TIMESTAMP,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = #{consultationId}
               AND doctor_id IS NULL
@@ -45,6 +47,7 @@ public interface ConsultationMapper extends BaseMapper<Consultation> {
             SET department_id = #{departmentId},
                 doctor_id = NULL,
                 status = #{status},
+                assigned_at = NULL,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = #{consultationId}
             """)
