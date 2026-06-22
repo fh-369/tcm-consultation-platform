@@ -13,6 +13,7 @@ import {
   urgencyDisplay,
 } from '../../features/consultation/display'
 import { getDoctorWorkflow } from '../../features/consultation/workflow'
+import { getApiErrorMessage as errorMessage } from '../../features/feedback'
 
 const loading = ref(false)
 const saving = ref(false)
@@ -31,10 +32,6 @@ const updateForm = reactive({
   doctorNote: '',
 })
 const workflow = computed(() => getDoctorWorkflow(selected.value?.status))
-
-function errorMessage(error, fallback) {
-  return error.response?.data?.message || error.message || fallback
-}
 
 async function loadConsultations() {
   loading.value = true

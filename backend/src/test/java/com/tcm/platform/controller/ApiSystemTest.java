@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcm.platform.config.SecurityConfig;
 import com.tcm.platform.dto.AIAnswerResponse;
 import com.tcm.platform.dto.AIContentRecommendation;
+import com.tcm.platform.dto.ConsultationExportFilter;
 import com.tcm.platform.dto.DashboardSummary;
 import com.tcm.platform.dto.LoginResponse;
 import com.tcm.platform.dto.PersonnelRecord;
@@ -389,6 +390,43 @@ class ApiSystemTest {
 
         mockMvc.perform(get("/api/admin/export/consultations"))
                 .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/admin/export/consultations/count"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "doctor1", roles = "DOCTOR")
+    void doctorDashboardUsesOnlyPersonalStatistics() throws Exception {
+        User doctor = new User();
+        doctor.setId(6L);
+        doctor.setUsername("doctor1");
+        doctor.setRole("doctor");
+        when(userMapper.selectOne(any())).thenReturn(doctor);
+        when(dashboardService.getDoctorSummary(6L)).thenReturn(new DashboardSummary(
+                "doctor",
+                List.of(Map.of("status", "接诊中", "count", 2)),
+                List.of(Map.of("urgency", "普通", "count", 2)),
+                List.of(Map.of("month", "2026-06", "count", 2)),
+                Map.of("assignedTotal", 2L),
+                List.of(),
+                List.of()
+        ));
+        when(dashboardService.getTrend("week", 6L)).thenReturn(
+                List.of(Map.of("period", "2026-06-16", "count", 2))
+        );
+
+        mockMvc.perform(get("/api/admin/dashboard"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.scope").value("doctor"))
+                .andExpect(jsonPath("$.data.metrics.assignedTotal").value(2));
+
+        mockMvc.perform(get("/api/admin/dashboard/trend").param("period", "week"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].count").value(2));
+
+        verify(dashboardService).getDoctorSummary(6L);
+        verify(dashboardService).getTrend("week", 6L);
     }
 
     @Test
@@ -514,23 +552,30 @@ class ApiSystemTest {
         admin.setId(1L);
         admin.setUsername("admin");
         when(userMapper.selectOne(any())).thenReturn(admin);
-        when(dashboardService.getSummary()).thenReturn(new DashboardSummary(
+        when(dashboardService.getAdminSummary()).thenReturn(new DashboardSummary(
+                "platform",
                 List.of(Map.of("status", "待接诊", "count", 2)),
                 List.of(Map.of("urgency", "普通", "count", 2)),
-                List.of(Map.of("month", "2026-06", "count", 2))
+                List.of(Map.of("month", "2026-06", "count", 2)),
+                Map.of("registeredPatients", 8L),
+                List.of(Map.of("department", "中医内科", "count", 2)),
+                List.of(Map.of("doctorName", "李医生", "activeCount", 1))
         ));
-        when(dashboardService.getTrend("week")).thenReturn(
+        when(dashboardService.getTrend("week", null)).thenReturn(
                 List.of(Map.of("period", "2026-06-16", "count", 2))
         );
         when(knowledgeArticleService.listArticles(anyLong(), anyLong(), any(), any(), any()))
                 .thenReturn(new Page<>());
         when(recipeService.listRecipes(anyLong(), anyLong(), any(), any(), any(), any()))
                 .thenReturn(new Page<>());
-        when(consultationExportService.exportCsv())
+        when(consultationExportService.count(any(ConsultationExportFilter.class)))
+                .thenReturn(1L);
+        when(consultationExportService.exportCsv(any(ConsultationExportFilter.class)))
                 .thenReturn("\uFEFF问诊ID,患者姓名\n".getBytes(StandardCharsets.UTF_8));
 
         mockMvc.perform(get("/api/admin/dashboard"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.scope").value("platform"))
                 .andExpect(jsonPath("$.data.statusDistribution[0].status").value("待接诊"));
 
         mockMvc.perform(get("/api/admin/dashboard/trend").param("period", "week"))
@@ -544,9 +589,17 @@ class ApiSystemTest {
         mockMvc.perform(get("/api/admin/recipe"))
                 .andExpect(status().isOk());
 
+        mockMvc.perform(get("/api/admin/export/consultations/count")
+                        .param("status", "待接诊"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value(1));
+
         mockMvc.perform(get("/api/admin/export/consultations"))
                 .andExpect(status().isOk())
-                .andExpect(header().string("Content-Disposition", "attachment; filename=\"consultations.csv\""))
+                .andExpect(header().string(
+                        "Content-Disposition",
+                        "attachment; filename=\"consultations-all-to-all.csv\""
+                ))
                 .andExpect(content().contentType("text/csv;charset=UTF-8"))
                 .andExpect(content().bytes("\uFEFF问诊ID,患者姓名\n".getBytes(StandardCharsets.UTF_8)));
     }

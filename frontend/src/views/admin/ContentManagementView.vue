@@ -14,6 +14,7 @@ import {
   CONTENT_CONFIGS,
   normalizeContentPayload,
 } from '../../features/admin/contentManagement'
+import { getApiErrorMessage as errorMessage } from '../../features/feedback'
 
 const props = defineProps({
   resource: {
@@ -43,10 +44,6 @@ const filters = reactive({
 const config = computed(() => CONTENT_CONFIGS[props.resource])
 const isKnowledge = computed(() => props.resource === 'knowledge')
 const publishedCount = computed(() => records.value.filter((item) => item.published).length)
-
-function errorMessage(error, fallback) {
-  return error.response?.data?.message || error.message || fallback
-}
 
 function formatTime(value) {
   if (!value) return '暂无'

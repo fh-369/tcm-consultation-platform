@@ -9,6 +9,7 @@ import {
 } from '../../api/adminConsultation'
 import { getDepartments } from '../../api/auth'
 import { getPersonnel } from '../../api/personnel'
+import { getApiErrorMessage as errorMessage } from '../../features/feedback'
 import {
   formatConsultationTime,
   isCrossDepartmentConsultation,
@@ -54,10 +55,6 @@ const assignmentDoctors = computed(
     generalDepartmentId.value,
   ),
 )
-
-function errorMessage(error, fallback) {
-  return error.response?.data?.message || error.message || fallback
-}
 
 async function loadConsultations() {
   loading.value = true

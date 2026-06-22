@@ -12,6 +12,19 @@ import org.apache.ibatis.annotations.Select;
 @Mapper
 public interface AccountMapper extends BaseMapper<Account> {
 
+    @Select("SELECT COUNT(*) FROM accounts WHERE role = 'patient'")
+    long countPatientAccounts();
+
+    @Select("""
+            SELECT COUNT(*)
+            FROM accounts a
+            JOIN users u ON u.account_id = a.id
+            WHERE a.role = 'doctor'
+              AND a.enabled = 1
+              AND u.approval_status = 'APPROVED'
+            """)
+    long countEnabledApprovedDoctors();
+
     @Select("""
             <script>
             SELECT a.id,

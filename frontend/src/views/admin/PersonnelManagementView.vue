@@ -14,6 +14,7 @@ import {
   canEnableDoctor,
   doctorReviewActions,
 } from '../../features/admin/doctorAdmission'
+import { getApiErrorMessage as errorMessage } from '../../features/feedback'
 
 const props = defineProps({
   resource: {
@@ -69,10 +70,6 @@ const pageCopy = computed(() => (
         empty: '暂无注册用户',
       }
 ))
-
-function errorMessage(error, fallback) {
-  return error.response?.data?.message || error.message || fallback
-}
 
 function formatTime(value) {
   if (!value) return '暂无'

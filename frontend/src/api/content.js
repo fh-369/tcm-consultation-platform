@@ -75,9 +75,20 @@ export async function getAIRecommendations(question) {
 export async function getDashboardSummary() {
   const summary = unwrapResult(await request.get('/admin/dashboard'))
   return {
+    scope: summary.scope || 'platform',
     statusDistribution: normalizeDistribution(summary.statusDistribution, 'status'),
     urgencyDistribution: normalizeDistribution(summary.urgencyDistribution, 'urgency'),
     trendLast6Months: normalizeDistribution(summary.trendLast6Months, 'month'),
+    metrics: summary.metrics || {},
+    departmentDistribution: normalizeDistribution(
+      summary.departmentDistribution,
+      'department',
+    ),
+    doctorWorkloads: (summary.doctorWorkloads || []).map((item) => ({
+      doctorId: item.doctorId,
+      doctorName: item.doctorName,
+      activeCount: Number(item.activeCount || 0),
+    })),
   }
 }
 
@@ -120,7 +131,14 @@ export async function uploadAdminContentImage(file) {
   }))
 }
 
-export async function exportConsultations() {
-  const response = await request.get('/admin/export/consultations', { responseType: 'blob' })
+export async function countExportConsultations(params) {
+  return unwrapResult(await request.get('/admin/export/consultations/count', { params }))
+}
+
+export async function exportConsultations(params) {
+  const response = await request.get('/admin/export/consultations', {
+    params,
+    responseType: 'blob',
+  })
   return response.data
 }

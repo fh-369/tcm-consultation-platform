@@ -10,6 +10,7 @@ import {
   formatConsultationTime,
   urgencyDisplay,
 } from '../../features/consultation/display'
+import { getApiErrorMessage as errorMessage } from '../../features/feedback'
 
 const loading = ref(false)
 const claimingId = ref(null)
@@ -22,10 +23,6 @@ const filters = reactive({
   urgency: '',
   keyword: '',
 })
-
-function errorMessage(error, fallback) {
-  return error.response?.data?.message || error.message || fallback
-}
 
 async function loadConsultations() {
   loading.value = true
