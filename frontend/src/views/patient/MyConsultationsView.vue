@@ -1,9 +1,18 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Bell, ChatLineRound, Plus, User } from '@element-plus/icons-vue'
+import { ArrowDown, Bell, ChatLineRound, Plus, User } from '@element-plus/icons-vue'
 
-import { getMyConsultations } from '../../api/consultation'
+import {
+  getConsultationMessages,
+  getMyConsultations,
+  sendConsultationMessage,
+} from '../../api/consultation'
+import {
+  canReplyToConsultation,
+  latestMessagePreview,
+  messageAuthorLabel,
+} from '../../features/consultation/communication'
 import {
   formatConsultationTime,
   reminderDisplay,
@@ -14,6 +23,8 @@ import {
 const loading = ref(false)
 const consultations = ref([])
 const total = ref(0)
+const expandedId = ref(null)
+const communication = reactive({})
 const filters = reactive({
   current: 1,
   size: 6,
@@ -46,6 +57,70 @@ function applyFilters() {
 function changePage(page) {
   filters.current = page
   loadConsultations()
+}
+
+function communicationState(id) {
+  if (!communication[id]) {
+    communication[id] = {
+      loaded: false,
+      loading: false,
+      sending: false,
+      error: '',
+      draft: '',
+      messages: [],
+    }
+  }
+  return communication[id]
+}
+
+async function loadMessages(item) {
+  const state = communicationState(item.id)
+  state.loading = true
+  state.error = ''
+  try {
+    state.messages = await getConsultationMessages(item.id)
+    state.loaded = true
+  } catch (error) {
+    state.error = errorMessage(error)
+  } finally {
+    state.loading = false
+  }
+}
+
+async function toggleDetails(item) {
+  if (expandedId.value === item.id) {
+    expandedId.value = null
+    return
+  }
+  expandedId.value = item.id
+  const state = communicationState(item.id)
+  if (!state.loaded && !state.loading) {
+    await loadMessages(item)
+  }
+}
+
+async function sendMessage(item) {
+  const state = communicationState(item.id)
+  const content = state.draft.trim()
+  if (!content) {
+    ElMessage.warning('请先填写回复内容')
+    return
+  }
+  state.sending = true
+  try {
+    const message = await sendConsultationMessage(item.id, content)
+    state.messages.push(message)
+    state.draft = ''
+    item.messageCount = state.messages.length
+    item.latestMessage = message.content
+    item.latestMessageSenderType = message.senderType
+    item.latestMessageAt = message.createdAt
+    ElMessage.success('回复已发送')
+  } catch (error) {
+    ElMessage.error(errorMessage(error))
+  } finally {
+    state.sending = false
+  }
 }
 
 onMounted(loadConsultations)
@@ -139,21 +214,89 @@ onMounted(loadConsultations)
                 { 'has-reply': item.progressRecords?.length || item.doctorNote },
               ]"
             >
-              <strong>处理进度</strong>
-              <ol v-if="item.progressRecords?.length" class="patient-timeline">
-                <li v-for="record in item.progressRecords" :key="record.id">
-                  <div>
-                    <span>{{ record.doctorName || '接诊医生' }}</span>
-                    <time>{{ formatConsultationTime(record.createdAt) }}</time>
-                  </div>
-                  <small>{{ record.previousStatus }} → {{ record.status }}</small>
-                  <p v-if="record.doctorNote">{{ record.doctorNote }}</p>
-                </li>
-              </ol>
-              <p v-else>{{ item.doctorNote || '医生暂未回复，请耐心等待。' }}</p>
+              <strong>{{ latestMessagePreview(item).label }}</strong>
+              <p class="feedback-preview">{{ latestMessagePreview(item).text }}</p>
+              <button class="details-toggle" type="button" @click="toggleDetails(item)">
+                <span>{{ latestMessagePreview(item).countText }}</span>
+                <span>{{ expandedId === item.id ? '收起详情' : '查看详细沟通' }}</span>
+                <el-icon :class="{ rotated: expandedId === item.id }"><ArrowDown /></el-icon>
+              </button>
             </div>
           </section>
         </div>
+
+        <section v-if="expandedId === item.id" class="communication-panel">
+          <div class="progress-column">
+            <header>
+              <span>问诊处理</span>
+              <strong>处理进度</strong>
+            </header>
+            <ol v-if="item.progressRecords?.length" class="patient-timeline">
+              <li v-for="record in item.progressRecords" :key="record.id">
+                <div>
+                  <span>{{ record.doctorName || '接诊医生' }}</span>
+                  <time>{{ formatConsultationTime(record.createdAt) }}</time>
+                </div>
+                <small>{{ record.previousStatus }} → {{ record.status }}</small>
+              </li>
+            </ol>
+            <p v-else class="empty-copy">医生接诊后，处理变化会显示在这里。</p>
+          </div>
+
+          <div class="conversation-column">
+            <header>
+              <span>医患沟通</span>
+              <strong>回复详情</strong>
+            </header>
+
+            <div v-if="communicationState(item.id).loading" class="conversation-state">
+              正在加载沟通记录...
+            </div>
+            <div v-else-if="communicationState(item.id).error" class="conversation-state error">
+              <p>{{ communicationState(item.id).error }}</p>
+              <button type="button" @click="loadMessages(item)">重新加载</button>
+            </div>
+            <div
+              v-else-if="communicationState(item.id).messages.length"
+              class="message-list"
+            >
+              <article
+                v-for="message in communicationState(item.id).messages"
+                :key="message.id"
+                :class="['message-item', `message-${message.senderType}`]"
+              >
+                <div>
+                  <strong>{{ messageAuthorLabel(message) }}</strong>
+                  <time>{{ formatConsultationTime(message.createdAt) }}</time>
+                </div>
+                <p>{{ message.content }}</p>
+              </article>
+            </div>
+            <div v-else class="conversation-state">暂时没有沟通记录。</div>
+
+            <div v-if="canReplyToConsultation(item.status)" class="patient-reply">
+              <el-input
+                v-model="communicationState(item.id).draft"
+                :rows="3"
+                maxlength="2000"
+                resize="vertical"
+                show-word-limit
+                placeholder="补充身体变化，或回复医生的建议"
+                type="textarea"
+              />
+              <el-button
+                type="primary"
+                :loading="communicationState(item.id).sending"
+                @click="sendMessage(item)"
+              >
+                发送回复
+              </el-button>
+            </div>
+            <p v-else class="reply-hint">
+              {{ item.status === '已完成' ? '问诊已完成，沟通记录仅供查看。' : '医生接诊后可以在这里回复。' }}
+            </p>
+          </div>
+        </section>
       </article>
 
       <el-empty
@@ -474,6 +617,48 @@ dd {
   color: var(--color-cinnabar);
 }
 
+.feedback-preview {
+  display: -webkit-box;
+  min-height: 52px;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.details-toggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px 0 0;
+  border: 0;
+  border-top: 1px solid rgb(65 126 96 / 10%);
+  background: transparent;
+  color: #315e49;
+  cursor: pointer;
+  font: inherit;
+}
+
+.details-toggle span:first-child {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.details-toggle span:nth-child(2) {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.details-toggle .el-icon {
+  transition: transform 180ms ease;
+}
+
+.details-toggle .el-icon.rotated {
+  transform: rotate(180deg);
+}
+
 .patient-timeline {
   display: grid;
   gap: 10px;
@@ -530,6 +715,125 @@ dd {
   white-space: pre-wrap;
 }
 
+.communication-panel {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.72fr) minmax(0, 1.28fr);
+  gap: 14px;
+  margin-top: 14px;
+  padding: 16px;
+  border: 1px solid rgb(65 126 96 / 13%);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 100% 0%, rgb(235 246 239 / 78%), transparent 34%),
+    rgb(249 252 250 / 96%);
+}
+
+.communication-panel > div {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid rgb(65 126 96 / 10%);
+  border-radius: 15px;
+  background: rgb(255 255 255 / 82%);
+}
+
+.communication-panel header {
+  display: grid;
+  gap: 4px;
+}
+
+.communication-panel header span {
+  color: var(--color-cinnabar);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.communication-panel header strong {
+  color: var(--color-ink);
+  font-size: 17px;
+}
+
+.message-list {
+  display: grid;
+  max-height: 360px;
+  gap: 10px;
+  margin-top: 14px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.message-item {
+  padding: 12px 14px;
+  border-radius: 14px;
+}
+
+.message-doctor {
+  margin-right: 34px;
+  background: #f0f6f2;
+}
+
+.message-patient {
+  margin-left: 34px;
+  background: #fff2ed;
+}
+
+.message-item > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.message-item strong {
+  color: var(--color-ink);
+  font-size: 13px;
+}
+
+.message-item time {
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.message-item p {
+  margin: 7px 0 0;
+  color: #365a49;
+  font-size: 14px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.conversation-state,
+.empty-copy,
+.reply-hint {
+  margin: 14px 0 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.conversation-state.error {
+  color: var(--color-cinnabar);
+}
+
+.conversation-state button {
+  margin-top: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--color-jade);
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.patient-reply {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.patient-reply .el-button {
+  justify-self: end;
+}
+
 
 .el-pagination {
   justify-content: center;
@@ -570,6 +874,10 @@ dd {
 
   .record-details,
   dl {
+    grid-template-columns: 1fr;
+  }
+
+  .communication-panel {
     grid-template-columns: 1fr;
   }
 }

@@ -15,6 +15,7 @@ import com.tcm.platform.mapper.DepartmentMapper;
 import com.tcm.platform.mapper.UserMapper;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -41,17 +42,36 @@ public class ConsultationWorkspaceService {
     private final UserMapper userMapper;
     private final AccountMapper accountMapper;
     private final DepartmentMapper departmentMapper;
+    private final ConsultationMessageService consultationMessageService;
 
+    @Autowired
     public ConsultationWorkspaceService(
             ConsultationMapper consultationMapper,
             UserMapper userMapper,
             AccountMapper accountMapper,
-            DepartmentMapper departmentMapper
+            DepartmentMapper departmentMapper,
+            ConsultationMessageService consultationMessageService
     ) {
         this.consultationMapper = consultationMapper;
         this.userMapper = userMapper;
         this.accountMapper = accountMapper;
         this.departmentMapper = departmentMapper;
+        this.consultationMessageService = consultationMessageService;
+    }
+
+    ConsultationWorkspaceService(
+            ConsultationMapper consultationMapper,
+            UserMapper userMapper,
+            AccountMapper accountMapper,
+            DepartmentMapper departmentMapper
+    ) {
+        this(
+                consultationMapper,
+                userMapper,
+                accountMapper,
+                departmentMapper,
+                null
+        );
     }
 
     public Page<ConsultationWorkspaceRecord> listForAdmin(
@@ -207,6 +227,14 @@ public class ConsultationWorkspaceService {
         );
         if (consultationMapper.insertProgressRecord(record) != 1) {
             throw new IllegalStateException("问诊处理记录保存失败");
+        }
+        if (hasText(request.getDoctorNote()) && consultationMessageService != null) {
+            consultationMessageService.appendDoctorMessage(
+                    consultation,
+                    doctorId,
+                    doctor.getDisplayName(),
+                    request.getDoctorNote().trim()
+            );
         }
         consultation.setProgressRecords(
                 consultationMapper.selectProgressRecords(List.of(consultationId))

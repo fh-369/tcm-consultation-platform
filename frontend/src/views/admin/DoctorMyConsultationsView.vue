@@ -3,9 +3,12 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 
 import {
+  getDoctorConsultationMessages,
   getMyDoctorConsultations,
+  sendDoctorConsultationMessage,
   updateDoctorConsultation,
 } from '../../api/doctorConsultation'
+import { messageAuthorLabel } from '../../features/consultation/communication'
 import {
   formatConsultationTime,
   reminderDisplay,
@@ -30,6 +33,12 @@ const filters = reactive({
 })
 const updateForm = reactive({
   doctorNote: '',
+})
+const messageState = reactive({
+  loading: false,
+  sending: false,
+  error: '',
+  messages: [],
 })
 const workflow = computed(() => getDoctorWorkflow(selected.value?.status))
 
@@ -68,10 +77,25 @@ function resetFilters() {
   loadConsultations()
 }
 
+async function loadMessages(id) {
+  messageState.loading = true
+  messageState.error = ''
+  try {
+    messageState.messages = await getDoctorConsultationMessages(id)
+  } catch (error) {
+    messageState.error = errorMessage(error, '沟通记录加载失败')
+  } finally {
+    messageState.loading = false
+  }
+}
+
 function openDetails(item) {
   selected.value = item
   updateForm.doctorNote = ''
+  messageState.messages = []
+  messageState.error = ''
   drawerVisible.value = true
+  loadMessages(item.id)
 }
 
 async function submitUpdate(payload, successMessage) {
@@ -81,6 +105,9 @@ async function submitUpdate(payload, successMessage) {
     selected.value = { ...selected.value, ...updated }
     updateForm.doctorNote = ''
     ElMessage.success(successMessage)
+    if (payload.doctorNote) {
+      await loadMessages(selected.value.id)
+    }
     await loadConsultations()
   } catch (error) {
     ElMessage.error(errorMessage(error, '问诊更新失败'))
@@ -93,13 +120,23 @@ function startConsultation() {
   submitUpdate({ status: '接诊中' }, '已开始接诊')
 }
 
-function saveReply() {
+async function saveReply() {
   const doctorNote = updateForm.doctorNote.trim()
   if (!doctorNote) {
     ElMessage.warning('请先填写本次医生回复')
     return
   }
-  submitUpdate({ status: '接诊中', doctorNote }, '医生回复已保存')
+  messageState.sending = true
+  try {
+    const message = await sendDoctorConsultationMessage(selected.value.id, doctorNote)
+    messageState.messages.push(message)
+    updateForm.doctorNote = ''
+    ElMessage.success('医生回复已发送')
+  } catch (error) {
+    ElMessage.error(errorMessage(error, '医生回复发送失败'))
+  } finally {
+    messageState.sending = false
+  }
 }
 
 function completeConsultation() {
@@ -247,6 +284,36 @@ onMounted(loadConsultations)
           <el-empty v-else :image-size="64" description="尚无处理记录" />
         </section>
 
+        <section class="conversation-panel">
+          <header>
+            <div>
+              <h3>医患沟通</h3>
+              <p>患者补充和医生回复按时间顺序保留。</p>
+            </div>
+            <span>{{ messageState.messages.length }} 条消息</span>
+          </header>
+
+          <div v-if="messageState.loading" class="conversation-empty">正在加载沟通记录...</div>
+          <div v-else-if="messageState.error" class="conversation-empty error">
+            <p>{{ messageState.error }}</p>
+            <el-button link type="primary" @click="loadMessages(selected.id)">重新加载</el-button>
+          </div>
+          <div v-else-if="messageState.messages.length" class="message-list">
+            <article
+              v-for="message in messageState.messages"
+              :key="message.id"
+              :class="['message-item', `message-${message.senderType}`]"
+            >
+              <div>
+                <strong>{{ messageAuthorLabel(message) }}</strong>
+                <time>{{ formatConsultationTime(message.createdAt) }}</time>
+              </div>
+              <p>{{ message.content }}</p>
+            </article>
+          </div>
+          <div v-else class="conversation-empty">暂时没有沟通记录。</div>
+        </section>
+
         <section v-if="workflow.canStart" class="workflow-action start-action">
           <div>
             <strong>准备开始接诊</strong>
@@ -258,18 +325,18 @@ onMounted(loadConsultations)
         </section>
 
         <el-form v-else-if="workflow.canReply" label-position="top">
-          <el-form-item label="医生回复">
+          <el-form-item label="回复患者">
             <el-input
               v-model="updateForm.doctorNote"
               :rows="5"
               maxlength="2000"
               show-word-limit
-              placeholder="填写患者可以看到的处理说明"
+              placeholder="填写患者可以看到的回复内容"
               type="textarea"
             />
           </el-form-item>
           <div class="workflow-buttons">
-            <el-button :loading="saving" @click="saveReply">保存回复</el-button>
+            <el-button :loading="messageState.sending" @click="saveReply">发送回复</el-button>
             <el-button type="primary" :loading="saving" @click="completeConsultation">
               完成问诊
             </el-button>
@@ -455,6 +522,86 @@ dd {
   border: 1px solid var(--color-border);
   border-radius: 18px;
   background: #f8fbf9;
+}
+
+.conversation-panel {
+  margin: 20px 0;
+  padding: 18px;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: #fffaf7;
+}
+
+.conversation-panel > header,
+.message-item > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.conversation-panel h3 {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 18px;
+}
+
+.conversation-panel header p,
+.conversation-panel header > span,
+.message-item time {
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.conversation-panel header p {
+  margin: 5px 0 0;
+}
+
+.message-list {
+  display: grid;
+  max-height: 360px;
+  gap: 10px;
+  margin-top: 16px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.message-item {
+  padding: 13px 14px;
+  border-radius: 14px;
+}
+
+.message-doctor {
+  margin-left: 34px;
+  background: #eaf4ee;
+}
+
+.message-patient {
+  margin-right: 34px;
+  background: #fff0ea;
+}
+
+.message-item strong {
+  color: var(--color-ink);
+  font-size: 13px;
+}
+
+.message-item p {
+  margin: 8px 0 0;
+  color: #365a49;
+  font-size: 13px;
+  line-height: 1.75;
+  white-space: pre-wrap;
+}
+
+.conversation-empty {
+  margin-top: 16px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.conversation-empty.error {
+  color: var(--color-cinnabar);
 }
 
 .progress-panel > header,

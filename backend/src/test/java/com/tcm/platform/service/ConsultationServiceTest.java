@@ -8,9 +8,11 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcm.platform.entity.Consultation;
 import com.tcm.platform.entity.ConsultationProgressRecord;
 import com.tcm.platform.entity.Department;
+import com.tcm.platform.dto.ConsultationMessageSummary;
 import com.tcm.platform.dto.ConsultationRequest;
 import com.tcm.platform.dto.ConsultationUpdateRequest;
 import com.tcm.platform.mapper.ConsultationMapper;
+import com.tcm.platform.mapper.ConsultationMessageMapper;
 import com.tcm.platform.mapper.DepartmentMapper;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeAll;
@@ -53,6 +55,9 @@ class ConsultationServiceTest {
     @Mock
     private AutoAssignmentService autoAssignmentService;
 
+    @Mock
+    private ConsultationMessageMapper consultationMessageMapper;
+
     @Test
     void listConsultationsSearchesPatientNameOrSymptomsByKeyword() {
         ConsultationService service = service();
@@ -91,6 +96,33 @@ class ConsultationServiceTest {
         assertThat(result.getRecords().get(0).getProgressRecords())
                 .extracting(ConsultationProgressRecord::getDoctorNote)
                 .containsExactly("请三天后反馈恢复情况。");
+    }
+
+    @Test
+    void patientConsultationsIncludeLatestMessageSummary() {
+        ConsultationService service = service();
+        Consultation consultation = new Consultation();
+        consultation.setId(7L);
+        consultation.setPatientAccountId(8L);
+        Page<Consultation> page = new Page<>(1, 10, 1);
+        page.setRecords(List.of(consultation));
+        ConsultationMessageSummary summary = new ConsultationMessageSummary();
+        summary.setConsultationId(7L);
+        summary.setMessageCount(3L);
+        summary.setLatestMessage("请继续记录饮食和睡眠情况。");
+        summary.setLatestMessageSenderType("doctor");
+        when(consultationMapper.selectPage(any(IPage.class), any(LambdaQueryWrapper.class)))
+                .thenReturn(page);
+        when(consultationMessageMapper.selectSummaries(List.of(7L)))
+                .thenReturn(List.of(summary));
+
+        Page<Consultation> result =
+                service.listConsultations(1, 10, null, null, 8L, null);
+
+        Consultation record = result.getRecords().get(0);
+        assertThat(record.getMessageCount()).isEqualTo(3L);
+        assertThat(record.getLatestMessage()).isEqualTo("请继续记录饮食和睡眠情况。");
+        assertThat(record.getLatestMessageSenderType()).isEqualTo("doctor");
     }
 
     @Test
@@ -250,7 +282,8 @@ class ConsultationServiceTest {
                 consultationMapper,
                 departmentMapper,
                 reminderService,
-                autoAssignmentService
+                autoAssignmentService,
+                consultationMessageMapper
         );
     }
 

@@ -4,12 +4,15 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcm.platform.common.Result;
 import com.tcm.platform.dto.ConsultationRequest;
+import com.tcm.platform.dto.ConsultationMessageRequest;
 import com.tcm.platform.entity.Consultation;
+import com.tcm.platform.entity.ConsultationMessage;
 import com.tcm.platform.entity.KnowledgeArticle;
 import com.tcm.platform.entity.PatientAccount;
 import com.tcm.platform.entity.Recipe;
 import com.tcm.platform.mapper.PatientAccountMapper;
 import com.tcm.platform.service.ConsultationService;
+import com.tcm.platform.service.ConsultationMessageService;
 import com.tcm.platform.service.RecipeService;
 import com.tcm.platform.service.KnowledgeArticleService;
 import jakarta.validation.Valid;
@@ -35,17 +38,20 @@ public class PatientController {
     private final KnowledgeArticleService knowledgeArticleService;
     private final PatientAccountMapper patientAccountMapper;
     private final RecipeService recipeService;
+    private final ConsultationMessageService consultationMessageService;
 
     public PatientController(
             ConsultationService consultationService,
             KnowledgeArticleService knowledgeArticleService,
             PatientAccountMapper patientAccountMapper,
-            RecipeService recipeService
+            RecipeService recipeService,
+            ConsultationMessageService consultationMessageService
     ) {
         this.consultationService = consultationService;
         this.knowledgeArticleService = knowledgeArticleService;
         this.patientAccountMapper = patientAccountMapper;
         this.recipeService = recipeService;
+        this.consultationMessageService = consultationMessageService;
     }
 
     @PostMapping("/consultation")
@@ -69,6 +75,35 @@ public class PatientController {
         PatientAccount patient = currentPatient(authentication);
         return Result.success(
                 consultationService.listConsultations(current, size, status, urgency, patient.getId(), null)
+        );
+    }
+
+    @GetMapping("/consultation/{id}/messages")
+    public Result<List<ConsultationMessage>> listConsultationMessages(
+            @PathVariable Long id,
+            Authentication authentication
+    ) {
+        PatientAccount patient = currentPatient(authentication);
+        return Result.success(
+                consultationMessageService.listForPatient(id, patient.getId())
+        );
+    }
+
+    @PostMapping("/consultation/{id}/messages")
+    public Result<ConsultationMessage> sendConsultationMessage(
+            @PathVariable Long id,
+            Authentication authentication,
+            @Valid @RequestBody ConsultationMessageRequest request
+    ) {
+        PatientAccount patient = currentPatient(authentication);
+        return Result.success(
+                "回复发送成功",
+                consultationMessageService.sendAsPatient(
+                        id,
+                        patient.getId(),
+                        displayName(patient),
+                        request
+                )
         );
     }
 
@@ -115,5 +150,11 @@ public class PatientController {
             throw new IllegalArgumentException("当前登录账号不是患者账号");
         }
         return patient;
+    }
+
+    private String displayName(PatientAccount patient) {
+        return patient.getDisplayName() == null || patient.getDisplayName().isBlank()
+                ? patient.getUsername()
+                : patient.getDisplayName();
     }
 }

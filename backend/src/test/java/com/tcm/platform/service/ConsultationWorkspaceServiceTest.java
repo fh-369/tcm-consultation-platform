@@ -360,6 +360,47 @@ class ConsultationWorkspaceServiceTest {
     }
 
     @Test
+    void finalDoctorReplyIsAlsoAddedToConversation() {
+        ConsultationMapper consultationMapper = mock(ConsultationMapper.class);
+        UserMapper userMapper = mock(UserMapper.class);
+        AccountMapper accountMapper = mock(AccountMapper.class);
+        DepartmentMapper departmentMapper = mock(DepartmentMapper.class);
+        ConsultationMessageService messageService = mock(ConsultationMessageService.class);
+        Consultation consultation = consultation(9L, 6L, "接诊中");
+        User doctor = doctor(6L, 16L);
+        Account account = new Account();
+        account.setId(16L);
+        account.setEnabled(true);
+        when(consultationMapper.selectById(9L)).thenReturn(consultation);
+        when(userMapper.selectById(6L)).thenReturn(doctor);
+        when(accountMapper.selectById(16L)).thenReturn(account);
+        when(consultationMapper.updateById(consultation)).thenReturn(1);
+        when(consultationMapper.insertProgressRecord(any(ConsultationProgressRecord.class)))
+                .thenReturn(1);
+        when(consultationMapper.selectProgressRecords(List.of(9L))).thenReturn(List.of());
+        ConsultationWorkspaceService service =
+                new ConsultationWorkspaceService(
+                        consultationMapper,
+                        userMapper,
+                        accountMapper,
+                        departmentMapper,
+                        messageService
+                );
+        ConsultationUpdateRequest request = new ConsultationUpdateRequest();
+        request.setStatus("已完成");
+        request.setDoctorNote("本次问诊完成，请继续规律作息。");
+
+        Consultation updated = service.updateAsDoctor(9L, request, 6L);
+
+        verify(messageService).appendDoctorMessage(
+                updated,
+                6L,
+                "张医生",
+                "本次问诊完成，请继续规律作息。"
+        );
+    }
+
+    @Test
     void doctorStartsPendingConsultationWithoutReply() {
         ConsultationMapper consultationMapper = mock(ConsultationMapper.class);
         UserMapper userMapper = mock(UserMapper.class);

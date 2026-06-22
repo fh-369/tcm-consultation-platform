@@ -10,6 +10,7 @@ import com.tcm.platform.dto.LoginResponse;
 import com.tcm.platform.dto.PersonnelRecord;
 import com.tcm.platform.entity.Account;
 import com.tcm.platform.entity.Consultation;
+import com.tcm.platform.entity.ConsultationMessage;
 import com.tcm.platform.entity.KnowledgeArticle;
 import com.tcm.platform.entity.PatientAccount;
 import com.tcm.platform.entity.Recipe;
@@ -18,6 +19,7 @@ import com.tcm.platform.mapper.AccountMapper;
 import com.tcm.platform.mapper.DepartmentMapper;
 import com.tcm.platform.mapper.PatientAccountMapper;
 import com.tcm.platform.mapper.ConsultationMapper;
+import com.tcm.platform.mapper.ConsultationMessageMapper;
 import com.tcm.platform.mapper.KnowledgeArticleMapper;
 import com.tcm.platform.mapper.RecipeMapper;
 import com.tcm.platform.mapper.UploadMapper;
@@ -27,6 +29,7 @@ import com.tcm.platform.service.AIService;
 import com.tcm.platform.service.AuthService;
 import com.tcm.platform.service.ConsultationExportService;
 import com.tcm.platform.service.ConsultationService;
+import com.tcm.platform.service.ConsultationMessageService;
 import com.tcm.platform.service.ConsultationWorkspaceService;
 import com.tcm.platform.service.DashboardService;
 import com.tcm.platform.service.KnowledgeArticleService;
@@ -92,6 +95,9 @@ class ApiSystemTest {
     private ConsultationWorkspaceService consultationWorkspaceService;
 
     @MockBean
+    private ConsultationMessageService consultationMessageService;
+
+    @MockBean
     private KnowledgeArticleService knowledgeArticleService;
 
     @MockBean
@@ -123,6 +129,9 @@ class ApiSystemTest {
 
     @MockBean
     private ConsultationMapper consultationMapper;
+
+    @MockBean
+    private ConsultationMessageMapper consultationMessageMapper;
 
     @MockBean
     private KnowledgeArticleMapper knowledgeArticleMapper;
@@ -484,6 +493,70 @@ class ApiSystemTest {
                 .listDepartmentPool(1, 10, "紧急", "胃痛", "all", 6L);
         verify(consultationWorkspaceService)
                 .listMine(1, 10, "接诊中", null, null, 6L);
+    }
+
+    @Test
+    @WithMockUser(username = "patient1", roles = "PATIENT")
+    void patientCanReadAndSendMessagesForOwnConsultation() throws Exception {
+        PatientAccount patient = new PatientAccount();
+        patient.setId(8L);
+        patient.setUsername("patient1");
+        patient.setDisplayName("李女士");
+        ConsultationMessage message = new ConsultationMessage();
+        message.setId(21L);
+        message.setSenderType("doctor");
+        message.setContent("请继续观察。");
+        when(patientAccountMapper.selectOne(any())).thenReturn(patient);
+        when(consultationMessageService.listForPatient(9L, 8L))
+                .thenReturn(List.of(message));
+        when(consultationMessageService.sendAsPatient(
+                eq(9L), eq(8L), eq("李女士"), any()
+        )).thenReturn(message);
+
+        mockMvc.perform(get("/api/patient/consultation/9/messages"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].content").value("请继续观察。"));
+
+        mockMvc.perform(post("/api/patient/consultation/9/messages")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"content":"今天感觉好一些了。"}
+                                """))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(username = "doctor1", roles = "DOCTOR")
+    void doctorCanReadAndSendMessagesOnlyThroughDoctorEndpoint() throws Exception {
+        User doctor = new User();
+        doctor.setId(6L);
+        doctor.setUsername("doctor1");
+        doctor.setDisplayName("张医生");
+        doctor.setRole("doctor");
+        ConsultationMessage message = new ConsultationMessage();
+        message.setId(22L);
+        message.setSenderType("patient");
+        message.setContent("今天感觉好一些了。");
+        when(userMapper.selectOne(any())).thenReturn(doctor);
+        when(consultationMessageService.listForDoctor(9L, 6L))
+                .thenReturn(List.of(message));
+        when(consultationMessageService.sendAsDoctor(
+                eq(9L), eq(6L), eq("张医生"), any()
+        )).thenReturn(message);
+
+        mockMvc.perform(get("/api/doctor/consultations/9/messages"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].content").value("今天感觉好一些了。"));
+
+        mockMvc.perform(post("/api/doctor/consultations/9/messages")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"content":"请继续保持清淡饮食。"}
+                                """))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/patient/consultation/9/messages"))
+                .andExpect(status().isForbidden());
     }
 
     @Test

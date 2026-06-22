@@ -33,4 +33,8 @@ public class ConsultationWorkspaceRecord {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private List<ConsultationProgressRecord> progressRecords;
+    private Long messageCount;
+    private String latestMessage;
+    private String latestMessageSenderType;
+    private LocalDateTime latestMessageAt;
 }

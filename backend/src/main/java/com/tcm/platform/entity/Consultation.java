@@ -26,6 +26,18 @@ public class Consultation {
     @TableField(exist = false)
     private List<ConsultationProgressRecord> progressRecords;
 
+    @TableField(exist = false)
+    private Long messageCount;
+
+    @TableField(exist = false)
+    private String latestMessage;
+
+    @TableField(exist = false)
+    private String latestMessageSenderType;
+
+    @TableField(exist = false)
+    private LocalDateTime latestMessageAt;
+
     private String patientName;
 
     private Integer age;

@@ -8,7 +8,9 @@ import com.tcm.platform.entity.Consultation;
 import com.tcm.platform.entity.ConsultationProgressRecord;
 import com.tcm.platform.entity.Department;
 import com.tcm.platform.mapper.ConsultationMapper;
+import com.tcm.platform.mapper.ConsultationMessageMapper;
 import com.tcm.platform.mapper.DepartmentMapper;
+import com.tcm.platform.dto.ConsultationMessageSummary;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -38,17 +40,20 @@ public class ConsultationService {
     private final DepartmentMapper departmentMapper;
     private final ReminderService reminderService;
     private final AutoAssignmentService autoAssignmentService;
+    private final ConsultationMessageMapper consultationMessageMapper;
 
     public ConsultationService(
             ConsultationMapper consultationMapper,
             DepartmentMapper departmentMapper,
             ReminderService reminderService,
-            AutoAssignmentService autoAssignmentService
+            AutoAssignmentService autoAssignmentService,
+            ConsultationMessageMapper consultationMessageMapper
     ) {
         this.consultationMapper = consultationMapper;
         this.departmentMapper = departmentMapper;
         this.reminderService = reminderService;
         this.autoAssignmentService = autoAssignmentService;
+        this.consultationMessageMapper = consultationMessageMapper;
     }
 
     @Transactional
@@ -113,6 +118,7 @@ public class ConsultationService {
         Page<Consultation> page = consultationMapper.selectPage(new Page<>(current, size), query);
         attachDepartmentNames(page.getRecords());
         attachProgressRecords(page.getRecords());
+        attachMessageSummaries(page.getRecords());
         return page;
     }
 
@@ -258,5 +264,32 @@ public class ConsultationService {
                         )
                 )
         );
+    }
+
+    private void attachMessageSummaries(List<Consultation> consultations) {
+        List<Long> consultationIds = consultations.stream()
+                .map(Consultation::getId)
+                .filter(Objects::nonNull)
+                .toList();
+        if (consultationIds.isEmpty()) {
+            return;
+        }
+        Map<Long, ConsultationMessageSummary> summaries =
+                consultationMessageMapper.selectSummaries(consultationIds).stream()
+                        .collect(Collectors.toMap(
+                                ConsultationMessageSummary::getConsultationId,
+                                Function.identity()
+                        ));
+        consultations.forEach(consultation -> {
+            ConsultationMessageSummary summary = summaries.get(consultation.getId());
+            if (summary == null) {
+                consultation.setMessageCount(0L);
+                return;
+            }
+            consultation.setMessageCount(summary.getMessageCount());
+            consultation.setLatestMessage(summary.getLatestMessage());
+            consultation.setLatestMessageSenderType(summary.getLatestMessageSenderType());
+            consultation.setLatestMessageAt(summary.getLatestMessageAt());
+        });
     }
 }
