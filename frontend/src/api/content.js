@@ -108,6 +108,18 @@ export async function deleteAdminContent(resource, id) {
   return unwrapResult(await request.delete(`/admin/${resource}/${id}`))
 }
 
+export async function updateAdminContentPublication(resource, id, published) {
+  return unwrapResult(await request.put(`/admin/${resource}/${id}/publication`, { published }))
+}
+
+export async function uploadAdminContentImage(file) {
+  const formData = new FormData()
+  formData.append('file', file)
+  return unwrapResult(await request.post('/admin/content-images', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }))
+}
+
 export async function exportConsultations() {
   const response = await request.get('/admin/export/consultations', { responseType: 'blob' })
   return response.data

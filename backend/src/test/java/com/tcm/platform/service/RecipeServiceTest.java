@@ -16,6 +16,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -83,6 +84,48 @@ class RecipeServiceTest {
         service.deleteRecipe(9L);
 
         verify(recipeMapper).deleteById(9L);
+    }
+
+    @Test
+    void updatePublicationOnlyChangesPublishedState() {
+        RecipeService service = new RecipeService(recipeMapper);
+        Recipe stored = recipe("山药粥", "[\"山药\"]", "[\"煮粥\"]");
+        stored.setId(6L);
+        stored.setPublished(false);
+        when(recipeMapper.selectById(6L)).thenReturn(stored);
+        when(recipeMapper.updateById(stored)).thenReturn(1);
+
+        Recipe updated = service.updatePublication(6L, true);
+
+        assertThat(updated.getPublished()).isTrue();
+        assertThat(updated.getName()).isEqualTo("山药粥");
+        verify(recipeMapper).updateById(stored);
+    }
+
+    @Test
+    void createRecipeNormalizesSeasonConstitutionAndText() {
+        RecipeService service = new RecipeService(recipeMapper);
+        when(recipeMapper.insert(any(Recipe.class))).thenReturn(1);
+        Recipe recipe = recipe("  山药粥  ", "[\"山药\"]", "[\"煮粥\"]");
+        recipe.setSeason(" 冬 ");
+        recipe.setConstitution(" 气虚质 ");
+
+        Recipe created = service.createRecipe(recipe);
+
+        assertThat(created.getName()).isEqualTo("山药粥");
+        assertThat(created.getSeason()).isEqualTo("冬");
+        assertThat(created.getConstitution()).isEqualTo("气虚质");
+    }
+
+    @Test
+    void createRecipeRejectsUnsupportedSeason() {
+        RecipeService service = new RecipeService(recipeMapper);
+        Recipe recipe = recipe("山药粥", "[\"山药\"]", "[\"煮粥\"]");
+        recipe.setSeason("雨季");
+
+        assertThatThrownBy(() -> service.createRecipe(recipe))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("请选择有效的适用季节");
     }
 
     private Recipe recipe(String name, String ingredients, String steps) {

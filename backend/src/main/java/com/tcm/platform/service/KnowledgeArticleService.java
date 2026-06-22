@@ -103,6 +103,7 @@ public class KnowledgeArticleService {
     public KnowledgeArticle createArticle(KnowledgeArticle article) {
         validateArticle(article);
         article.setId(null);
+        normalizeArticle(article);
         article.setCategory(resolveCategory(article));
         article.setPublished(Boolean.TRUE.equals(article.getPublished()));
         article.setViewCount(article.getViewCount() == null ? 0 : article.getViewCount());
@@ -117,6 +118,7 @@ public class KnowledgeArticleService {
     public KnowledgeArticle updateArticle(Long id, KnowledgeArticle request) {
         KnowledgeArticle article = getArticle(id);
         validateArticle(request);
+        normalizeArticle(request);
 
         article.setTitle(request.getTitle());
         article.setSummary(request.getSummary());
@@ -128,6 +130,19 @@ public class KnowledgeArticleService {
 
         if (knowledgeArticleMapper.updateById(article) != 1) {
             throw new IllegalStateException("更新知识文章失败");
+        }
+        return article;
+    }
+
+    @Transactional
+    public KnowledgeArticle updatePublication(Long id, Boolean published) {
+        KnowledgeArticle article = getArticle(id);
+        if (Boolean.TRUE.equals(published)) {
+            validatePublishedArticle(article);
+        }
+        article.setPublished(Boolean.TRUE.equals(published));
+        if (knowledgeArticleMapper.updateById(article) != 1) {
+            throw new IllegalStateException("更新文章发布状态失败");
         }
         return article;
     }
@@ -147,9 +162,28 @@ public class KnowledgeArticleService {
         if (!hasText(article.getTitle())) {
             throw new IllegalArgumentException("文章标题不能为空");
         }
-        if (!hasText(article.getContent())) {
+        if (Boolean.TRUE.equals(article.getPublished()) && !hasText(article.getContent())) {
             throw new IllegalArgumentException("文章正文不能为空");
         }
+    }
+
+    private void validatePublishedArticle(KnowledgeArticle article) {
+        if (!hasText(article.getContent())) {
+            throw new IllegalArgumentException("文章正文不能为空，无法发布");
+        }
+    }
+
+    private void normalizeArticle(KnowledgeArticle article) {
+        article.setTitle(trim(article.getTitle()));
+        article.setCategory(trim(article.getCategory()));
+        article.setSummary(trim(article.getSummary()));
+        article.setContent(trim(article.getContent()));
+        article.setTips(trim(article.getTips()));
+        article.setCoverImageUrl(trim(article.getCoverImageUrl()));
+    }
+
+    private String trim(String value) {
+        return value == null ? null : value.trim();
     }
 
     private void validatePage(long current, long size) {

@@ -7,6 +7,8 @@ import com.tcm.platform.dto.ConsultationAssignmentRequest;
 import com.tcm.platform.dto.ConsultationDepartmentUpdateRequest;
 import com.tcm.platform.dto.ConsultationUpdateRequest;
 import com.tcm.platform.dto.ConsultationWorkspaceRecord;
+import com.tcm.platform.dto.KnowledgeArticleAdminRequest;
+import com.tcm.platform.dto.PublicationRequest;
 import com.tcm.platform.entity.Consultation;
 import com.tcm.platform.entity.KnowledgeArticle;
 import com.tcm.platform.entity.User;
@@ -130,16 +132,29 @@ public class AdminController {
     }
 
     @PostMapping("/knowledge")
-    public Result<KnowledgeArticle> createKnowledgeArticle(@RequestBody KnowledgeArticle article) {
-        return Result.success("知识文章创建成功", knowledgeArticleService.createArticle(article));
+    public Result<KnowledgeArticle> createKnowledgeArticle(
+            @Valid @RequestBody KnowledgeArticleAdminRequest request
+    ) {
+        return Result.success("知识文章创建成功", knowledgeArticleService.createArticle(request.toEntity()));
     }
 
     @PutMapping("/knowledge/{id}")
     public Result<KnowledgeArticle> updateKnowledgeArticle(
             @PathVariable Long id,
-            @RequestBody KnowledgeArticle article
+            @Valid @RequestBody KnowledgeArticleAdminRequest request
     ) {
-        return Result.success("知识文章更新成功", knowledgeArticleService.updateArticle(id, article));
+        return Result.success("知识文章更新成功", knowledgeArticleService.updateArticle(id, request.toEntity()));
+    }
+
+    @PutMapping("/knowledge/{id}/publication")
+    public Result<KnowledgeArticle> updateKnowledgePublication(
+            @PathVariable Long id,
+            @Valid @RequestBody PublicationRequest request
+    ) {
+        return Result.success(
+                Boolean.TRUE.equals(request.published()) ? "文章已发布" : "文章已取消发布",
+                knowledgeArticleService.updatePublication(id, request.published())
+        );
     }
 
     @DeleteMapping("/knowledge/{id}")

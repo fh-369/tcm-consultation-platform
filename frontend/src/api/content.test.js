@@ -142,6 +142,35 @@ describe('content and AI API', () => {
     expect(request.delete).toHaveBeenCalledWith('/admin/knowledge/1')
   })
 
+  it('updates publication without resubmitting the whole content record', async () => {
+    request.put.mockResolvedValue({ data: { code: 200, data: { id: 1, published: true } } })
+    const { updateAdminContentPublication } = await import('./content')
+
+    await updateAdminContentPublication('knowledge', 1, true)
+
+    expect(request.put).toHaveBeenCalledWith('/admin/knowledge/1/publication', {
+      published: true,
+    })
+  })
+
+  it('uploads a content cover as multipart form data', async () => {
+    request.post.mockResolvedValue({
+      data: { code: 200, data: { url: '/uploads/content/cover.png' } },
+    })
+    const { uploadAdminContentImage } = await import('./content')
+    const file = new File(['cover'], 'cover.png', { type: 'image/png' })
+
+    await uploadAdminContentImage(file)
+
+    expect(request.post).toHaveBeenCalledWith(
+      '/admin/content-images',
+      expect.any(FormData),
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    )
+    const formData = request.post.mock.calls[0][1]
+    expect(formData.get('file')).toBe(file)
+  })
+
   it('downloads consultation CSV from the plural endpoint', async () => {
     const csv = new Blob(['id,status'])
     request.get.mockResolvedValue({ data: csv })
