@@ -200,6 +200,19 @@ class ConsultationServiceTest {
     }
 
     @Test
+    void patientCannotReadAnotherPatientsConsultation() {
+        ConsultationService service = service();
+        Consultation consultation = new Consultation();
+        consultation.setId(7L);
+        consultation.setPatientAccountId(8L);
+        when(consultationMapper.selectById(7L)).thenReturn(consultation);
+
+        assertThatThrownBy(() -> service.getPatientConsultation(7L, 9L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("问诊单不存在或无权访问");
+    }
+
+    @Test
     void createConsultationRejectsMissingOrDisabledDepartment() {
         ConsultationRequest missingDepartment = consultationRequest("普通");
         missingDepartment.setDepartmentId(null);

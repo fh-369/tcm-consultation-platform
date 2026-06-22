@@ -505,6 +505,38 @@ class ConsultationWorkspaceServiceTest {
     }
 
     @Test
+    void disabledOrUnapprovedDoctorCannotOpenPersonalConsultations() {
+        ConsultationMapper consultationMapper = mock(ConsultationMapper.class);
+        UserMapper userMapper = mock(UserMapper.class);
+        AccountMapper accountMapper = mock(AccountMapper.class);
+        DepartmentMapper departmentMapper = mock(DepartmentMapper.class);
+        User pendingDoctor = doctor(6L, 16L);
+        pendingDoctor.setApprovalStatus("PENDING");
+        when(userMapper.selectById(6L)).thenReturn(pendingDoctor);
+        ConsultationWorkspaceService service =
+                new ConsultationWorkspaceService(
+                        consultationMapper, userMapper, accountMapper, departmentMapper
+                );
+
+        assertThatThrownBy(() ->
+                service.listMine(1, 10, null, null, null, 6L)
+        ).hasMessage("医生账号尚未通过审核");
+
+        User approvedDoctor = doctor(7L, 17L);
+        Account disabledAccount = new Account();
+        disabledAccount.setId(17L);
+        disabledAccount.setEnabled(false);
+        when(userMapper.selectById(7L)).thenReturn(approvedDoctor);
+        when(accountMapper.selectById(17L)).thenReturn(disabledAccount);
+
+        assertThatThrownBy(() ->
+                service.listMine(1, 10, null, null, null, 7L)
+        ).hasMessage("医生账号已停用");
+
+        verify(consultationMapper, never()).selectPage(any(), any());
+    }
+
+    @Test
     void completedConsultationCannotBeReassignedOrClaimed() {
         ConsultationMapper consultationMapper = mock(ConsultationMapper.class);
         UserMapper userMapper = mock(UserMapper.class);

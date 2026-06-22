@@ -323,10 +323,13 @@ class ApiSystemTest {
     @Test
     void protectedEndpointsRejectAnonymousAccess() throws Exception {
         mockMvc.perform(get("/api/patient/consultation/my"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(401))
+                .andExpect(jsonPath("$.message").value("登录状态无效，请重新登录"));
 
         mockMvc.perform(get("/api/admin/dashboard"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(401));
     }
 
     @Test
@@ -343,14 +346,21 @@ class ApiSystemTest {
     @WithMockUser(username = "patient1", roles = "PATIENT")
     void patientCannotAccessAdminEndpoints() throws Exception {
         mockMvc.perform(get("/api/admin/dashboard"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value(403))
+                .andExpect(jsonPath("$.message").value("当前账号无权执行此操作"));
 
         mockMvc.perform(post("/api/admin/knowledge")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"title":"无权创建","content":"正文"}
-                                """))
-                .andExpect(status().isForbidden());
+                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value(403));
+
+        mockMvc.perform(get("/api/doctor/consultations/mine"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("当前账号无权执行此操作"));
     }
 
     @Test
@@ -360,6 +370,24 @@ class ApiSystemTest {
                 .andExpect(status().isForbidden());
 
         mockMvc.perform(get("/api/admin/personnel/doctors"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "doctor1", roles = "DOCTOR")
+    void doctorCannotAccessPatientOrAdministratorManagementEndpoints() throws Exception {
+        mockMvc.perform(get("/api/patient/consultation/my"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value(403));
+
+        mockMvc.perform(post("/api/admin/knowledge")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"title":"无权创建","content":"正文"}
+                                """))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/admin/export/consultations"))
                 .andExpect(status().isForbidden());
     }
 
@@ -445,6 +473,10 @@ class ApiSystemTest {
         mockMvc.perform(put("/api/admin/consultation/9/claim"))
                 .andExpect(status().isForbidden());
 
+        mockMvc.perform(get("/api/doctor/consultations/mine"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value(403));
+
         mockMvc.perform(put("/api/admin/consultation/9/department")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -452,6 +484,27 @@ class ApiSystemTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.departmentName").value("中医妇科"));
+    }
+
+    @Test
+    @WithMockUser(username = "doctor1", roles = "DOCTOR")
+    void doctorBusinessErrorsRemainVisibleToTheClient() throws Exception {
+        User doctor = new User();
+        doctor.setId(6L);
+        doctor.setUsername("doctor1");
+        doctor.setRole("doctor");
+        when(userMapper.selectOne(any())).thenReturn(doctor);
+        when(consultationWorkspaceService.updateAsDoctor(eq(9L), any(), eq(6L)))
+                .thenThrow(new IllegalArgumentException("该问诊单未分配给当前医生"));
+
+        mockMvc.perform(put("/api/doctor/consultations/9")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"status":"接诊中"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("该问诊单未分配给当前医生"));
     }
 
     @Test
