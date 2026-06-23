@@ -5,7 +5,6 @@ import com.tcm.platform.dto.AIContentRecommendation;
 import com.tcm.platform.dto.AIQuestionRequest;
 import com.tcm.platform.entity.Consultation;
 import com.tcm.platform.entity.KnowledgeArticle;
-import com.tcm.platform.entity.Recipe;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -52,16 +51,21 @@ public class AIContextService {
         return result;
     }
 
-    public List<AIContentRecommendation> findRecommendations(String question) {
+    public List<AIContentRecommendation> findRecommendations(
+            String question,
+            Long patientAccountId,
+            Long consultationId
+    ) {
         if (!hasText(question)) {
             return List.of();
         }
 
+        String consultationContext = buildConsultationContext(patientAccountId, consultationId);
+        String recommendationContext = String.join(" ", question, consultationContext);
         List<KnowledgeArticle> articles = records(knowledgeArticleService.listPublishedArticles(1, 100, null, null));
-        List<Recipe> recipes = records(recipeService.listRecipes(1, 100, null, null, true, null));
         List<AIContentRecommendation> recommendations = new ArrayList<>();
 
-        for (KnowledgeArticle article : rankArticles(question, articles)) {
+        for (KnowledgeArticle article : rankArticles(recommendationContext, articles)) {
             recommendations.add(new AIContentRecommendation(
                     article.getId(),
                     "knowledge",
@@ -69,34 +73,17 @@ public class AIContextService {
                     shorten(firstText(article.getSummary(), article.getContent()), 90)
             ));
         }
-        for (Recipe recipe : rankRecipes(question, recipes)) {
-            recommendations.add(new AIContentRecommendation(
-                    recipe.getId(),
-                    "recipe",
-                    text(recipe.getName()),
-                    shorten(firstText(recipe.getSummary(), recipe.getSuitableFor()), 90)
-            ));
-        }
         return recommendations;
     }
 
     private List<KnowledgeArticle> rankArticles(String question, List<KnowledgeArticle> articles) {
         return articles.stream()
+                .filter(article -> articleScore(question, article) > 0)
                 .sorted(Comparator
                         .comparingInt((KnowledgeArticle article) -> articleScore(question, article))
                         .reversed()
                         .thenComparing(KnowledgeArticle::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
-                .limit(2)
-                .toList();
-    }
-
-    private List<Recipe> rankRecipes(String question, List<Recipe> recipes) {
-        return recipes.stream()
-                .sorted(Comparator
-                        .comparingInt((Recipe recipe) -> recipeScore(question, recipe))
-                        .reversed()
-                        .thenComparing(Recipe::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
-                .limit(2)
+                .limit(4)
                 .toList();
     }
 
@@ -108,20 +95,6 @@ public class AIContextService {
                         text(article.getCategory()),
                         text(article.getSummary()),
                         text(article.getContent())
-                )
-        );
-    }
-
-    private int recipeScore(String question, Recipe recipe) {
-        return relevanceScore(
-                question,
-                String.join(" ",
-                        text(recipe.getName()),
-                        text(recipe.getSeason()),
-                        text(recipe.getConstitution()),
-                        text(recipe.getSuitableFor()),
-                        text(recipe.getSummary()),
-                        text(recipe.getIngredients())
                 )
         );
     }

@@ -16,6 +16,9 @@ import com.tcm.platform.entity.PatientAccount;
 import com.tcm.platform.entity.Recipe;
 import com.tcm.platform.entity.User;
 import com.tcm.platform.mapper.AccountMapper;
+import com.tcm.platform.mapper.AIConversationMapper;
+import com.tcm.platform.mapper.AIConversationRecommendationMapper;
+import com.tcm.platform.mapper.AIMessageMapper;
 import com.tcm.platform.mapper.DepartmentMapper;
 import com.tcm.platform.mapper.PatientAccountMapper;
 import com.tcm.platform.mapper.ConsultationMapper;
@@ -26,6 +29,7 @@ import com.tcm.platform.mapper.UploadMapper;
 import com.tcm.platform.mapper.UserMapper;
 import com.tcm.platform.security.JwtUtil;
 import com.tcm.platform.service.AIService;
+import com.tcm.platform.service.AIConversationService;
 import com.tcm.platform.service.AuthService;
 import com.tcm.platform.service.ConsultationExportService;
 import com.tcm.platform.service.ConsultationService;
@@ -113,10 +117,22 @@ class ApiSystemTest {
     private AIService aiService;
 
     @MockBean
+    private AIConversationService aiConversationService;
+
+    @MockBean
     private PersonnelService personnelService;
 
     @MockBean
     private AccountMapper accountMapper;
+
+    @MockBean
+    private AIConversationMapper aiConversationMapper;
+
+    @MockBean
+    private AIConversationRecommendationMapper aiConversationRecommendationMapper;
+
+    @MockBean
+    private AIMessageMapper aiMessageMapper;
 
     @MockBean
     private PatientAccountMapper patientAccountMapper;
@@ -263,11 +279,12 @@ class ApiSystemTest {
             consumer.accept("建议先清淡饮食。");
             return null;
         }).when(aiService).streamAnswer(eq("结合问诊单怎么调养？"), any(), eq(8L), eq(10L), any());
+        when(aiConversationService.buildContext(22L, 8L)).thenReturn(List.of());
 
         var mvcResult = mockMvc.perform(post("/api/patient/ai/question/stream")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"question":"结合问诊单怎么调养？","consultationId":10}
+                                {"conversationId":22,"question":"结合问诊单怎么调养？","consultationId":10}
                                 """))
                 .andExpect(request().asyncStarted())
                 .andReturn();
@@ -280,7 +297,11 @@ class ApiSystemTest {
     @Test
     @WithMockUser(username = "patient1", roles = "PATIENT")
     void patientCanLoadAIContentRecommendations() throws Exception {
-        when(aiService.findRecommendations("胃口不好怎么调养？")).thenReturn(List.of(
+        PatientAccount patient = new PatientAccount();
+        patient.setId(8L);
+        patient.setUsername("patient1");
+        when(patientAccountMapper.selectOne(any())).thenReturn(patient);
+        when(aiService.findRecommendations("胃口不好怎么调养？", 8L, null)).thenReturn(List.of(
                 new AIContentRecommendation(6L, "knowledge", "一餐如何吃得更均衡", "从食物种类开始调整。"),
                 new AIContentRecommendation(9L, "recipe", "山药香菇鸡肉粥", "适合作为清淡日常一餐。")
         ));

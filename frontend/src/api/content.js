@@ -37,7 +37,14 @@ export async function askAI(question, context = []) {
   return unwrapResult(await request.post('/patient/ai/question', { question, context }, { timeout: 60000 }))
 }
 
-export async function askAIStream({ question, context = [], consultationId = null, onChunk, signal }) {
+export async function askAIStream({
+  question,
+  context = [],
+  consultationId = null,
+  conversationId,
+  onChunk,
+  signal,
+}) {
   const { token } = loadSession(getBrowserStorage())
   const response = await fetch(`${API_BASE_URL}/patient/ai/question/stream`, {
     method: 'POST',
@@ -45,7 +52,7 @@ export async function askAIStream({ question, context = [], consultationId = nul
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ question, context, consultationId }),
+    body: JSON.stringify({ question, context, consultationId, conversationId }),
     signal,
   })
 
@@ -68,8 +75,39 @@ export async function askAIStream({ question, context = [], consultationId = nul
   }
 }
 
-export async function getAIRecommendations(question) {
-  return unwrapResult(await request.post('/patient/ai/recommendations', { question }))
+export async function getAIRecommendations({
+  question,
+  consultationId = null,
+  conversationId = null,
+}) {
+  return unwrapResult(await request.post('/patient/ai/recommendations', {
+    question,
+    consultationId,
+    conversationId,
+  }))
+}
+
+export async function getAIConversations(params = { current: 1, size: 20 }) {
+  return unwrapResult(await request.get('/patient/ai/conversations', { params }))
+}
+
+export async function createAIConversation(payload) {
+  return unwrapResult(await request.post('/patient/ai/conversations', payload))
+}
+
+export async function getAIConversation(id, params = { messageCurrent: 1, messageSize: 30 }) {
+  return unwrapResult(await request.get(`/patient/ai/conversations/${id}`, { params }))
+}
+
+export async function deleteAIConversation(id) {
+  return unwrapResult(await request.delete(`/patient/ai/conversations/${id}`))
+}
+
+export async function importLegacyAIConversation(id, payload) {
+  return unwrapResult(await request.post(
+    `/patient/ai/conversations/${id}/legacy-content`,
+    payload,
+  ))
 }
 
 export async function getDashboardSummary() {

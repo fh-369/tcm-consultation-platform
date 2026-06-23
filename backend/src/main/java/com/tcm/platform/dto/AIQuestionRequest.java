@@ -22,6 +22,8 @@ public class AIQuestionRequest {
 
     private Long consultationId;
 
+    private Long conversationId;
+
     public List<ContextMessage> getContext() {
         return context == null ? List.of() : context;
     }

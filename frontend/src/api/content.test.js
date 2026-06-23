@@ -114,10 +114,12 @@ describe('content and AI API', () => {
     })
     const { getAIRecommendations } = await import('./content')
 
-    const result = await getAIRecommendations('晚饭怎么吃？')
+    const result = await getAIRecommendations({ question: '晚饭怎么吃？' })
 
     expect(request.post).toHaveBeenCalledWith('/patient/ai/recommendations', {
       question: '晚饭怎么吃？',
+      consultationId: null,
+      conversationId: null,
     })
     expect(result).toHaveLength(2)
   })

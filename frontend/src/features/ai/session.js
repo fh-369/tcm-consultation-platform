@@ -22,9 +22,72 @@ export function createConversation(seed = '') {
   return {
     id: createId(),
     title: trimTitle(seed),
+    consultationId: null,
     createdAt,
     updatedAt: createdAt,
     messages: [],
+    recommendations: [],
+    recommendationInitialized: false,
+    recommendationsExpanded: false,
+    persisted: false,
+    messageTotal: 0,
+    hasMoreMessages: false,
+    messageCurrent: 1,
+  }
+}
+
+export function normalizeConversation(conversation = {}) {
+  return {
+    ...conversation,
+    id: conversation.id,
+    title: trimTitle(conversation.title),
+    consultationId: conversation.consultationId ?? null,
+    createdAt: conversation.createdAt || now(),
+    updatedAt: conversation.updatedAt || conversation.createdAt || now(),
+    messages: (conversation.messages || []).map((message) => ({
+      ...message,
+      streaming: false,
+    })),
+    recommendations: conversation.recommendations || [],
+    recommendationInitialized: Boolean(conversation.recommendationInitialized),
+    recommendationsExpanded: false,
+    persisted: true,
+    messageTotal: Number(conversation.messageTotal || 0),
+    hasMoreMessages: Boolean(conversation.hasMoreMessages),
+    messageCurrent: 1,
+  }
+}
+
+export function buildLegacyImportPayload(conversation = {}) {
+  const recommendations = []
+  const seen = new Set()
+  for (const message of conversation.messages || []) {
+    for (const item of message.recommendations || []) {
+      const key = `${item.type}-${item.id}`
+      if (item.type !== 'knowledge' || seen.has(key) || recommendations.length >= 4) {
+        continue
+      }
+      seen.add(key)
+      recommendations.push({
+        id: item.id,
+        type: item.type,
+        title: item.title,
+        description: item.description || '',
+      })
+    }
+  }
+  return {
+    messages: (conversation.messages || [])
+      .filter((message) => ['user', 'assistant'].includes(message.role))
+      .map((message) => ({
+        role: message.role,
+        content: String(message.content || '').trim(),
+        fallback: Boolean(message.fallback),
+        disclaimer: message.disclaimer || '',
+      }))
+      .filter((message) => message.content)
+      .slice(0, 500),
+    recommendations,
   }
 }
 

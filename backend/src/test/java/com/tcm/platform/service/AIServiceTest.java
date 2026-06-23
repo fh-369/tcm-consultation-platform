@@ -129,13 +129,13 @@ class AIServiceTest {
                 "一餐如何吃得更均衡",
                 "从食物种类与比例开始调整。"
         );
-        when(aiContextService.findRecommendations("晚饭怎么吃？")).thenReturn(List.of(recommendation));
+        when(aiContextService.findRecommendations("晚饭怎么吃？", 7L, 12L)).thenReturn(List.of(recommendation));
         AIService service = service(dashScopeClient, "test-key", aiContextService);
 
-        var result = service.findRecommendations(" 晚饭怎么吃？ ");
+        var result = service.findRecommendations(" 晚饭怎么吃？ ", 7L, 12L);
 
         assertThat(result).containsExactly(recommendation);
-        verify(aiContextService).findRecommendations("晚饭怎么吃？");
+        verify(aiContextService).findRecommendations("晚饭怎么吃？", 7L, 12L);
         verifyNoInteractions(dashScopeClient);
     }
 
