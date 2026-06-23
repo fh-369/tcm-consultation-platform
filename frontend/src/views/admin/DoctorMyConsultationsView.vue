@@ -164,22 +164,35 @@ onMounted(loadConsultations)
     <section class="filters">
       <el-input
         v-model="filters.keyword"
+        class="search-input"
         clearable
         placeholder="搜索患者姓名或主要症状"
         @keyup.enter="search"
-      />
-      <el-select v-model="filters.status" clearable placeholder="全部状态">
+      >
+        <template #prefix><span class="search-mark">⌕</span></template>
+      </el-input>
+      <el-select
+        v-model="filters.status"
+        clearable
+        placeholder="全部状态"
+        popper-class="jade-select-popper"
+      >
         <el-option label="待接诊" value="待接诊" />
         <el-option label="接诊中" value="接诊中" />
         <el-option label="已完成" value="已完成" />
       </el-select>
-      <el-select v-model="filters.urgency" clearable placeholder="全部紧急程度">
+      <el-select
+        v-model="filters.urgency"
+        clearable
+        placeholder="全部紧急程度"
+        popper-class="jade-select-popper"
+      >
         <el-option label="普通" value="普通" />
         <el-option label="紧急" value="紧急" />
         <el-option label="非常紧急" value="非常紧急" />
       </el-select>
-      <el-button type="primary" @click="search">筛选</el-button>
-      <el-button @click="resetFilters">重置</el-button>
+      <el-button class="filter-button" type="primary" @click="search">筛选</el-button>
+      <el-button class="reset-button" @click="resetFilters">重置</el-button>
     </section>
 
     <section class="table-card">
@@ -415,7 +428,9 @@ onMounted(loadConsultations)
   padding: 14px;
   border: 1px solid var(--color-border);
   border-radius: 18px;
-  background: rgb(255 255 255 / 88%);
+  background:
+    radial-gradient(circle at 0 50%, rgb(225 240 231 / 68%), transparent 28%),
+    rgb(255 255 255 / 90%);
   box-shadow: 0 10px 28px rgb(21 56 42 / 5%);
 }
 
@@ -425,6 +440,62 @@ onMounted(loadConsultations)
 
 .filters .el-select {
   width: 160px;
+}
+
+.filters :deep(.el-input__wrapper),
+.filters :deep(.el-select__wrapper) {
+  min-height: 44px;
+  border-radius: 13px;
+  background: #f7faf8;
+  box-shadow: inset 0 0 0 1px rgb(43 92 68 / 12%);
+  transition: box-shadow .18s ease, background .18s ease;
+}
+
+.filters :deep(.el-input__wrapper:hover),
+.filters :deep(.el-select__wrapper:hover) {
+  background: white;
+  box-shadow: inset 0 0 0 1px rgb(39 101 72 / 28%);
+}
+
+.filters :deep(.el-input__wrapper.is-focus),
+.filters :deep(.el-select__wrapper.is-focused) {
+  background: white;
+  box-shadow:
+    inset 0 0 0 1px #2d7657,
+    0 0 0 3px rgb(45 118 87 / 10%);
+}
+
+.search-mark {
+  color: #47715d;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.filter-button,
+.reset-button {
+  min-height: 44px;
+  border-radius: 13px;
+  font-weight: 800;
+}
+
+.filter-button {
+  min-width: 78px;
+  border: 0;
+  background: linear-gradient(135deg, #174f3a, #2b7656);
+  box-shadow: 0 7px 16px rgb(18 72 50 / 16%);
+}
+
+.reset-button {
+  min-width: 68px;
+  border-color: transparent;
+  background: #eef5f1;
+  color: #50685d;
+}
+
+.reset-button:hover {
+  border-color: rgb(45 118 87 / 12%);
+  background: #e3f0e8;
+  color: #174f3a;
 }
 
 .table-card {
@@ -693,5 +764,30 @@ dd {
   .filters {
     flex-wrap: wrap;
   }
+}
+
+:global(.jade-select-popper.el-popper) {
+  overflow: hidden;
+  border: 1px solid rgb(48 98 74 / 13%);
+  border-radius: 15px;
+  box-shadow: 0 16px 38px rgb(24 63 45 / 14%);
+}
+
+:global(.jade-select-popper .el-select-dropdown__item) {
+  margin: 4px 7px;
+  border-radius: 9px;
+  color: #4f675c;
+  font-weight: 650;
+}
+
+:global(.jade-select-popper .el-select-dropdown__item.is-hovering) {
+  background: #edf5f0;
+  color: #174f3a;
+}
+
+:global(.jade-select-popper .el-select-dropdown__item.is-selected) {
+  background: #dceee4;
+  color: #174f3a;
+  font-weight: 850;
 }
 </style>

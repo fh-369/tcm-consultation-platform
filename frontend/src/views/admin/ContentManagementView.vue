@@ -208,11 +208,14 @@ onMounted(load)
     <section class="content-toolbar">
       <el-input
         v-model="filters.keyword"
+        class="search-input"
         clearable
         :placeholder="isKnowledge ? '搜索文章标题或摘要' : '搜索药膳名称、摘要或适合人群'"
         @clear="search"
         @keyup.enter="search"
-      />
+      >
+        <template #prefix><span class="search-mark">⌕</span></template>
+      </el-input>
       <el-select
         v-if="isKnowledge"
         v-model="filters.category"
@@ -220,6 +223,7 @@ onMounted(load)
         clearable
         filterable
         placeholder="全部文章分类"
+        popper-class="jade-select-popper"
         @change="search"
       >
         <el-option
@@ -234,6 +238,7 @@ onMounted(load)
         v-model="filters.season"
         clearable
         placeholder="全部季节"
+        popper-class="jade-select-popper"
         @change="search"
       >
         <el-option
@@ -249,6 +254,7 @@ onMounted(load)
         clearable
         filterable
         placeholder="全部体质"
+        popper-class="jade-select-popper"
         @change="search"
       >
         <el-option
@@ -262,13 +268,14 @@ onMounted(load)
         v-model="filters.published"
         clearable
         placeholder="全部发布状态"
+        popper-class="jade-select-popper"
         @change="search"
       >
         <el-option label="已发布" :value="true" />
         <el-option label="草稿" :value="false" />
       </el-select>
-      <el-button type="primary" @click="search">搜索</el-button>
-      <el-button @click="resetFilters">重置</el-button>
+      <el-button class="filter-button" type="primary" @click="search">搜索</el-button>
+      <el-button class="reset-button" @click="resetFilters">重置</el-button>
     </section>
 
     <section class="content-table-card">
@@ -420,10 +427,13 @@ onMounted(load)
   gap: 9px;
   margin-top: 22px;
   padding: 14px;
-  border: 1px solid rgb(47 95 72 / 10%);
-  border-radius: 18px;
-  background: rgb(255 255 255 / 82%);
-  box-shadow: 0 10px 28px rgb(21 56 42 / 4%);
+  flex-wrap: wrap;
+  border: 1px solid rgb(47 95 72 / 12%);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 0 50%, rgb(225 240 231 / 72%), transparent 28%),
+    rgb(255 255 255 / 92%);
+  box-shadow: 0 12px 32px rgb(21 56 42 / 6%);
 }
 
 .content-toolbar .el-input {
@@ -432,6 +442,62 @@ onMounted(load)
 
 .content-toolbar .el-select {
   width: 150px;
+}
+
+.content-toolbar :deep(.el-input__wrapper),
+.content-toolbar :deep(.el-select__wrapper) {
+  min-height: 44px;
+  border-radius: 13px;
+  background: #f7faf8;
+  box-shadow: inset 0 0 0 1px rgb(43 92 68 / 12%);
+  transition: box-shadow .18s ease, background .18s ease;
+}
+
+.content-toolbar :deep(.el-input__wrapper:hover),
+.content-toolbar :deep(.el-select__wrapper:hover) {
+  background: white;
+  box-shadow: inset 0 0 0 1px rgb(39 101 72 / 28%);
+}
+
+.content-toolbar :deep(.el-input__wrapper.is-focus),
+.content-toolbar :deep(.el-select__wrapper.is-focused) {
+  background: white;
+  box-shadow:
+    inset 0 0 0 1px #2d7657,
+    0 0 0 3px rgb(45 118 87 / 10%);
+}
+
+.search-mark {
+  color: #47715d;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.filter-button,
+.reset-button {
+  min-height: 44px;
+  border-radius: 13px;
+  font-weight: 800;
+}
+
+.filter-button {
+  min-width: 78px;
+  border: 0;
+  background: linear-gradient(135deg, #174f3a, #2b7656);
+  box-shadow: 0 7px 16px rgb(18 72 50 / 16%);
+}
+
+.reset-button {
+  min-width: 68px;
+  border-color: transparent;
+  background: #eef5f1;
+  color: #50685d;
+}
+
+.reset-button:hover {
+  border-color: rgb(45 118 87 / 12%);
+  background: #e3f0e8;
+  color: #174f3a;
 }
 
 .content-table-card {
@@ -548,6 +614,31 @@ onMounted(load)
 .el-pagination {
   justify-content: center;
   margin-top: 18px;
+}
+
+:global(.jade-select-popper.el-popper) {
+  overflow: hidden;
+  border: 1px solid rgb(48 98 74 / 13%);
+  border-radius: 15px;
+  box-shadow: 0 16px 38px rgb(24 63 45 / 14%);
+}
+
+:global(.jade-select-popper .el-select-dropdown__item) {
+  margin: 4px 7px;
+  border-radius: 9px;
+  color: #4f675c;
+  font-weight: 650;
+}
+
+:global(.jade-select-popper .el-select-dropdown__item.is-hovering) {
+  background: #edf5f0;
+  color: #174f3a;
+}
+
+:global(.jade-select-popper .el-select-dropdown__item.is-selected) {
+  background: #dceee4;
+  color: #174f3a;
+  font-weight: 850;
 }
 
 @media (max-width: 900px) {
