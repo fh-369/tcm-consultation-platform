@@ -59,13 +59,11 @@ const pageCopy = computed(() => (
   isDoctors.value
     ? {
         title: '医生管理',
-        description: '审核医生入驻申请，维护科室资料与账号状态。',
         search: '搜索用户名、医生姓名、科室或联系电话',
         empty: '暂无医生账号',
       }
     : {
         title: '用户管理',
-        description: '查看平台注册用户、联系方式与账号使用状态。',
         search: '搜索用户名、昵称或手机号',
         empty: '暂无注册用户',
       }
@@ -247,10 +245,7 @@ onMounted(() => {
 <template>
   <section class="personnel-page">
     <header class="personnel-heading">
-      <div>
-        <h1>{{ pageCopy.title }}</h1>
-        <p>{{ pageCopy.description }}</p>
-      </div>
+      <h1>{{ pageCopy.title }}</h1>
       <div class="total-badge">
         <strong>{{ total }}</strong>
         <span>{{ isDoctors ? '名医生' : '位用户' }}</span>
@@ -494,12 +489,6 @@ onMounted(() => {
   font-family: "Noto Serif SC", "STSong", serif;
   font-size: 32px;
   letter-spacing: -.04em;
-}
-
-.personnel-heading p {
-  margin: 8px 0 0;
-  color: var(--color-text-muted);
-  font-size: 12px;
 }
 
 .total-badge {

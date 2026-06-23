@@ -71,6 +71,10 @@ export function getWorkspaceIdentity(role) {
   return WORKSPACE_IDENTITIES[role] || WORKSPACE_IDENTITIES.admin
 }
 
+export function getSidebarWidth(collapsed) {
+  return collapsed ? '0px' : '252px'
+}
+
 export function loadSidebarCollapsed(storage) {
   try {
     return storage?.getItem(SIDEBAR_COLLAPSED_KEY) === 'true'

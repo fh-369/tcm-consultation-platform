@@ -78,10 +78,7 @@ onMounted(loadConsultations)
 <template>
   <section class="doctor-page">
     <header class="page-heading">
-      <div>
-        <h1>科室问诊池</h1>
-        <p>查看本科室及综合咨询中的待接诊记录，认领后统一进入“我的问诊”处理。</p>
-      </div>
+      <h1>科室问诊池</h1>
       <div class="pool-count">
         <strong>{{ total }}</strong>
         <small>张等待认领</small>
@@ -173,49 +170,51 @@ onMounted(loadConsultations)
 
 .page-heading {
   display: flex;
-  align-items: end;
+  min-height: 120px;
+  align-items: center;
   justify-content: space-between;
   gap: 24px;
-  padding: 26px 28px;
+  padding: 22px 30px;
   border-radius: 26px;
   background:
-    radial-gradient(circle at 85% 15%, rgb(152 202 174 / 26%), transparent 30%),
-    linear-gradient(135deg, #0f4c36, #1d684b);
+    radial-gradient(circle at 88% 12%, rgb(164 211 184 / 28%), transparent 32%),
+    linear-gradient(132deg, #0d4934 0%, #145b40 54%, #2f7a5b 100%);
   color: white;
   box-shadow: 0 18px 42px rgb(18 65 47 / 14%);
 }
 
 .page-heading h1 {
-  margin: 0 0 6px;
-  font-family: "Noto Serif SC", "STSong", serif;
-  font-size: 30px;
-}
-
-.page-heading p {
   margin: 0;
-  color: rgb(255 255 255 / 72%);
-  font-size: 12px;
+  font-family: "Noto Serif SC", "STSong", serif;
+  font-size: 32px;
+  letter-spacing: .015em;
+  line-height: 1.2;
 }
 
 .pool-count {
-  display: grid;
-  min-width: 116px;
-  padding: 16px 20px;
-  border: 1px solid rgb(255 255 255 / 18%);
-  border-radius: 20px;
-  background: rgb(255 255 255 / 10%);
-  text-align: right;
-  backdrop-filter: blur(12px);
+  display: inline-flex;
+  min-height: 58px;
+  align-items: center;
+  gap: 12px;
+  padding: 0 20px;
+  border: 1px solid rgb(255 255 255 / 22%);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 12%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 12%);
+  backdrop-filter: blur(14px);
 }
 
 .pool-count strong {
   font-family: "Noto Serif SC", "STSong", serif;
-  font-size: 32px;
+  font-size: 30px;
+  line-height: 1;
 }
 
 .pool-count small {
-  color: rgb(255 255 255 / 66%);
-  font-size: 10px;
+  color: rgb(255 255 255 / 78%);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .filters {
@@ -225,8 +224,58 @@ onMounted(loadConsultations)
   padding: 14px;
   border: 1px solid var(--color-border);
   border-radius: 18px;
-  background: rgb(255 255 255 / 88%);
+  background:
+    radial-gradient(circle at 0 50%, rgb(225 240 231 / 68%), transparent 30%),
+    rgb(255 255 255 / 90%);
   box-shadow: 0 10px 28px rgb(21 56 42 / 5%);
+}
+
+.filters :deep(.el-segmented) {
+  --el-segmented-bg-color: transparent;
+  --el-segmented-item-selected-color: white;
+  --el-segmented-item-selected-bg-color: transparent;
+  min-height: 46px;
+  padding: 5px;
+  border: 1px solid rgb(46 101 74 / 12%);
+  border-radius: 999px;
+  background: rgb(226 239 231 / 76%);
+  box-shadow: inset 0 1px 3px rgb(25 68 48 / 6%);
+}
+
+.filters :deep(.el-segmented__group) {
+  gap: 4px;
+}
+
+.filters :deep(.el-segmented__item) {
+  min-height: 36px;
+  padding: 0 17px;
+  border-radius: 999px;
+  color: #526b60;
+  font-size: 13px;
+  font-weight: 750;
+  transition:
+    color .18s ease,
+    background .18s ease,
+    box-shadow .18s ease,
+    transform .18s ease;
+}
+
+.filters :deep(.el-segmented__item:hover) {
+  background: rgb(255 255 255 / 55%);
+  color: var(--color-ink);
+}
+
+.filters :deep(.el-segmented__item-selected) {
+  border-radius: 999px;
+  background: linear-gradient(135deg, #174f3a, #2b7656);
+  box-shadow:
+    0 7px 16px rgb(18 72 50 / 20%),
+    inset 0 1px 0 rgb(255 255 255 / 16%);
+}
+
+.filters :deep(.el-segmented__item.is-selected) {
+  color: white;
+  transform: translateY(-1px);
 }
 
 .filters .el-input {

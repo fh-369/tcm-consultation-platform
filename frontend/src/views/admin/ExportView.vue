@@ -114,10 +114,7 @@ onMounted(async () => {
 <template>
   <section class="export-page">
     <header class="export-heading">
-      <div>
-        <h1>问诊数据导出</h1>
-        <p>按业务条件筛选并导出 UTF-8 CSV，文件可直接使用 Excel 打开。</p>
-      </div>
+      <h1>问诊数据导出</h1>
       <div class="format-badge">
         <strong>CSV</strong>
         <span>UTF-8</span>
@@ -239,12 +236,6 @@ onMounted(async () => {
   font-family: "Noto Serif SC", "STSong", serif;
   font-size: 32px;
   letter-spacing: -.04em;
-}
-
-.export-heading p {
-  margin: 8px 0 0;
-  color: var(--color-text-muted);
-  font-size: 12px;
 }
 
 .format-badge {

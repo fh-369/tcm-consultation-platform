@@ -193,14 +193,7 @@ onMounted(load)
 <template>
   <section class="content-page">
     <header class="content-heading">
-      <div>
-        <h1>{{ config.title }}</h1>
-        <p>
-          {{ isKnowledge
-            ? '维护面向用户的养生文章、阅读摘要和日常提示。'
-            : '维护药膳食材、制作步骤和适用季节与体质。' }}
-        </p>
-      </div>
+      <h1>{{ config.title }}</h1>
       <div class="heading-actions">
         <div class="content-summary">
           <strong>{{ total }}</strong>
@@ -391,12 +384,6 @@ onMounted(load)
   font-family: "Noto Serif SC", "STSong", serif;
   font-size: 32px;
   letter-spacing: -.04em;
-}
-
-.content-heading p {
-  margin: 8px 0 0;
-  color: var(--color-text-muted);
-  font-size: 12px;
 }
 
 .heading-actions {

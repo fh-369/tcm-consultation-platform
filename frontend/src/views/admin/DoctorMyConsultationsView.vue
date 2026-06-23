@@ -154,10 +154,7 @@ onMounted(loadConsultations)
 <template>
   <section class="doctor-page">
     <header class="page-heading">
-      <div>
-        <h1>我的问诊</h1>
-        <p>集中处理已经认领或由管理员分配给你的问诊，不混入其他医生的记录。</p>
-      </div>
+      <h1>我的问诊</h1>
       <div class="record-count">
         <strong>{{ total }}</strong>
         <small>张负责问诊</small>
@@ -362,49 +359,53 @@ onMounted(loadConsultations)
 
 .page-heading {
   display: flex;
-  align-items: end;
+  min-height: 120px;
+  align-items: center;
   justify-content: space-between;
   gap: 24px;
-  padding: 26px 28px;
-  border: 1px solid rgb(47 95 72 / 12%);
+  padding: 22px 30px;
+  border: 0;
   border-radius: 26px;
   background:
-    radial-gradient(circle at 90% 10%, rgb(221 237 227 / 92%), transparent 34%),
-    white;
-  box-shadow: 0 16px 38px rgb(21 56 42 / 7%);
+    radial-gradient(circle at 88% 12%, rgb(164 211 184 / 28%), transparent 32%),
+    linear-gradient(132deg, #0d4934 0%, #145b40 54%, #2f7a5b 100%);
+  box-shadow: 0 18px 42px rgb(18 65 47 / 14%);
 }
 
 .page-heading h1 {
-  margin: 0 0 6px;
-  color: var(--color-ink);
-  font-family: "Noto Serif SC", "STSong", serif;
-  font-size: 30px;
-}
-
-.page-heading p {
   margin: 0;
-  color: var(--color-text-muted);
-  font-size: 12px;
+  color: white;
+  font-family: "Noto Serif SC", "STSong", serif;
+  font-size: 32px;
+  letter-spacing: .015em;
+  line-height: 1.2;
 }
 
 .record-count {
-  display: grid;
-  min-width: 116px;
-  padding: 16px 20px;
-  border-radius: 20px;
-  background: var(--color-ink);
+  display: inline-flex;
+  min-height: 58px;
+  align-items: center;
+  gap: 12px;
+  padding: 0 20px;
+  border: 1px solid rgb(255 255 255 / 22%);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 12%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 12%);
   color: white;
-  text-align: right;
+  backdrop-filter: blur(14px);
 }
 
 .record-count strong {
   font-family: "Noto Serif SC", "STSong", serif;
-  font-size: 32px;
+  font-size: 30px;
+  line-height: 1;
 }
 
 .record-count small {
-  color: rgb(255 255 255 / 68%);
-  font-size: 10px;
+  color: rgb(255 255 255 / 78%);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .filters {

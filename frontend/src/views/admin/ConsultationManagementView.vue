@@ -201,10 +201,7 @@ onMounted(async () => {
 <template>
   <section class="management-page">
     <header class="management-heading">
-      <div>
-        <h1>问诊调度</h1>
-        <p>查看平台全部问诊，为待处理记录安排负责医生。</p>
-      </div>
+      <h1>问诊调度</h1>
       <span>共 {{ total }} 张问诊单</span>
     </header>
 
@@ -407,12 +404,6 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-}
-
-.management-heading p {
-  margin: 8px 0 0;
-  color: var(--color-text-muted);
-  font-size: 12px;
 }
 
 .management-heading h1 {

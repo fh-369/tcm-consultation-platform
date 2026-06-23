@@ -6,9 +6,7 @@ const route = useRoute()
 
 <template>
   <section class="admin-placeholder">
-    <p>后台能力建设</p>
     <h1>{{ route.meta.title }}</h1>
-    <span>{{ route.meta.description || '该模块将在后续小阶段接入真实管理功能。' }}</span>
   </section>
 </template>
 
@@ -22,20 +20,8 @@ const route = useRoute()
   box-shadow: var(--shadow-card);
 }
 
-.admin-placeholder p {
-  color: var(--color-cinnabar);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-}
-
 .admin-placeholder h1 {
-  margin: 16px 0 10px;
+  margin: 0;
   font-size: 32px;
-}
-
-.admin-placeholder span {
-  color: var(--color-text-muted);
-  line-height: 1.8;
 }
 </style>

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   getAdminNavigation,
+  getSidebarWidth,
   loadSidebarCollapsed,
   saveSidebarCollapsed,
   getWorkspaceIdentity,
@@ -65,5 +66,10 @@ describe('admin workspace role configuration', () => {
 
     saveSidebarCollapsed(storage, false)
     expect(loadSidebarCollapsed(storage)).toBe(false)
+  })
+
+  it('fully removes the desktop sidebar width when collapsed', () => {
+    expect(getSidebarWidth(false)).toBe('252px')
+    expect(getSidebarWidth(true)).toBe('0px')
   })
 })

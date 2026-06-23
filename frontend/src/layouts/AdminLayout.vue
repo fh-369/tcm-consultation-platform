@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import {
   getAdminNavigation,
+  getSidebarWidth,
   getWorkspaceIdentity,
   loadSidebarCollapsed,
   saveSidebarCollapsed,
@@ -18,6 +19,7 @@ const navigation = computed(() => getAdminNavigation(auth.role))
 const identity = computed(() => getWorkspaceIdentity(auth.role))
 const pageTitle = computed(() => route.meta.title || identity.value.workspaceLabel)
 const sidebarCollapsed = ref(loadSidebarCollapsed(globalThis.localStorage))
+const sidebarWidth = computed(() => getSidebarWidth(sidebarCollapsed.value))
 const currentDate = new Intl.DateTimeFormat('zh-CN', {
   month: 'long',
   day: 'numeric',
@@ -42,6 +44,7 @@ async function logout() {
       `role-${auth.role || 'admin'}`,
       { 'sidebar-collapsed': sidebarCollapsed },
     ]"
+    :style="{ '--admin-sidebar-width': sidebarWidth }"
   >
     <aside class="admin-sidebar">
       <button
@@ -119,16 +122,12 @@ async function logout() {
 .admin-shell {
   display: grid;
   height: 100vh;
-  grid-template-columns: 252px minmax(0, 1fr);
+  grid-template-columns: var(--admin-sidebar-width, 252px) minmax(0, 1fr);
   overflow: hidden;
   background:
     radial-gradient(circle at 92% 6%, rgb(118 169 142 / 13%), transparent 24%),
     #f1f4f1;
   transition: grid-template-columns .24s ease;
-}
-
-.admin-shell.sidebar-collapsed {
-  grid-template-columns: 76px minmax(0, 1fr);
 }
 
 .admin-sidebar {
@@ -356,7 +355,21 @@ async function logout() {
 }
 
 .sidebar-collapsed .admin-sidebar {
-  padding-inline: 10px;
+  padding: 0;
+  border-right: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.sidebar-collapsed .admin-sidebar > :not(.sidebar-toggle) {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sidebar-collapsed .sidebar-toggle {
+  top: 19px;
+  right: -46px;
 }
 
 .sidebar-collapsed .admin-brand {
@@ -401,6 +414,10 @@ async function logout() {
 .sidebar-collapsed .sidebar-account {
   justify-content: center;
   padding-inline: 0;
+}
+
+.sidebar-collapsed .admin-topbar {
+  padding-left: 64px;
 }
 
 .admin-content {
@@ -503,6 +520,15 @@ async function logout() {
 
   .sidebar-collapsed .admin-sidebar {
     padding: 12px;
+    border-right: 1px solid rgb(29 74 54 / 10%);
+    background: rgb(249 250 248 / 96%);
+    box-shadow: 18px 0 42px rgb(21 56 42 / 5%);
+  }
+
+  .sidebar-collapsed .admin-sidebar > :not(.sidebar-toggle) {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
   }
 
   .sidebar-collapsed .admin-brand {
@@ -523,6 +549,10 @@ async function logout() {
     margin-inline: 0;
     padding: 0 11px;
     border-radius: 13px;
+  }
+
+  .sidebar-collapsed .admin-topbar {
+    padding-left: 26px;
   }
 
   .workspace-card,

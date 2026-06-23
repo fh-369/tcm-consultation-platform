@@ -128,11 +128,6 @@ onMounted(loadDashboard)
       <div>
         <small>{{ isDoctor ? '个人接诊概览' : '平台运营概览' }}</small>
         <h1>{{ auth.displayName || identity.roleLabel }}，欢迎回来</h1>
-        <span>
-          {{ isDoctor
-            ? '这里仅统计分配给你的问诊，不包含其他医生和科室问诊池的数据。'
-            : '从真实业务数据观察用户、医生、内容和问诊处理状态。' }}
-        </span>
       </div>
       <div class="welcome-actions">
         <RouterLink :to="isDoctor ? '/admin/my-consultations' : '/admin/consultations'">
@@ -272,7 +267,7 @@ onMounted(loadDashboard)
 
 .welcome-panel {
   display: flex;
-  min-height: 176px;
+  min-height: 146px;
   align-items: center;
   justify-content: space-between;
   gap: 30px;
@@ -303,15 +298,6 @@ onMounted(loadDashboard)
   font-family: "Noto Serif SC", "STSong", serif;
   font-size: clamp(28px, 3vw, 42px);
   letter-spacing: -.04em;
-}
-
-.welcome-panel span {
-  display: block;
-  max-width: 660px;
-  margin-top: 12px;
-  color: rgb(255 255 255 / 72%);
-  font-size: 13px;
-  line-height: 1.8;
 }
 
 .welcome-actions {
