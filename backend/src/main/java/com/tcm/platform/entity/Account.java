@@ -25,6 +25,8 @@ public class Account {
 
     private String role;
 
+    private Boolean enabled;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 

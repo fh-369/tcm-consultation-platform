@@ -12,6 +12,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 class AIContextServiceTest {
@@ -68,14 +69,61 @@ class AIContextServiceTest {
                 .doesNotContain("晚餐如何吃得更均衡")
                 .doesNotContain("山药香菇鸡肉粥");
 
-        var recommendations = service.findRecommendations("最近胃口不好怎么调养？");
+        var recommendations = service.findRecommendations("最近胃口不好怎么调养？", 7L, 12L);
 
-        assertThat(recommendations).hasSize(2);
+        assertThat(recommendations).hasSize(1);
         assertThat(recommendations.get(0).type()).isEqualTo("knowledge");
         assertThat(recommendations.get(0).title()).isEqualTo("晚餐如何吃得更均衡");
-        assertThat(recommendations.get(1).type()).isEqualTo("recipe");
-        assertThat(recommendations.get(1).title()).isEqualTo("山药香菇鸡肉粥");
-        verify(consultationService).getPatientConsultation(12L, 7L);
+        verify(consultationService, times(2)).getPatientConsultation(12L, 7L);
+    }
+
+    @Test
+    void returnsNoRecommendationWhenPublishedArticlesAreUnrelated() {
+        KnowledgeArticleService knowledgeArticleService = mock(KnowledgeArticleService.class);
+        RecipeService recipeService = mock(RecipeService.class);
+        ConsultationService consultationService = mock(ConsultationService.class);
+        AIContextService service = new AIContextService(
+                knowledgeArticleService,
+                recipeService,
+                consultationService
+        );
+        KnowledgeArticle article = new KnowledgeArticle();
+        article.setTitle("春季散步小记");
+        article.setCategory("运动养护");
+        article.setSummary("天气温和时可以适量步行。");
+        when(knowledgeArticleService.listPublishedArticles(1, 100, null, null))
+                .thenReturn(pageOf(article));
+
+        assertThat(service.findRecommendations("电脑键盘怎么清洁？", 7L, null)).isEmpty();
+    }
+
+    @Test
+    void selectedConsultationParticipatesInFirstRecommendationMatching() {
+        KnowledgeArticleService knowledgeArticleService = mock(KnowledgeArticleService.class);
+        RecipeService recipeService = mock(RecipeService.class);
+        ConsultationService consultationService = mock(ConsultationService.class);
+        AIContextService service = new AIContextService(
+                knowledgeArticleService,
+                recipeService,
+                consultationService
+        );
+        KnowledgeArticle sleepArticle = new KnowledgeArticle();
+        sleepArticle.setId(1L);
+        sleepArticle.setTitle("睡眠不安稳时如何调整作息");
+        sleepArticle.setCategory("睡眠起居");
+        sleepArticle.setSummary("从固定入睡时间和白天活动开始。");
+        Consultation consultation = new Consultation();
+        consultation.setSymptoms("最近失眠，入睡困难");
+        consultation.setDuration("一周");
+        consultation.setUrgency("普通");
+        when(knowledgeArticleService.listPublishedArticles(1, 100, null, null))
+                .thenReturn(pageOf(sleepArticle));
+        when(consultationService.getPatientConsultation(9L, 3L)).thenReturn(consultation);
+
+        var result = service.findRecommendations("日常应该注意什么？", 3L, 9L);
+
+        assertThat(result).extracting("title")
+                .containsExactly("睡眠不安稳时如何调整作息");
     }
 
     @SafeVarargs

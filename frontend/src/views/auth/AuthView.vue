@@ -156,6 +156,7 @@ async function submitRegister() {
         </el-form>
 
         <p class="switch-copy">已经有账号？<button type="button" @click="switchMode('login')">返回登录</button></p>
+        <RouterLink class="doctor-entry" to="/doctor/apply">我是医生，申请入驻</RouterLink>
       </div>
     </section>
   </main>
@@ -327,6 +328,19 @@ h1 {
   cursor: pointer;
   font: inherit;
   font-weight: 800;
+}
+
+.doctor-entry {
+  display: block;
+  width: fit-content;
+  margin: 14px auto 0;
+  color: #476b58;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.doctor-entry:hover {
+  color: var(--color-cinnabar);
 }
 
 :deep(.el-input__wrapper) {

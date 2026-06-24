@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { canAccessRole, defaultRouteForRole } from './access'
+import {
+  canAccessRole,
+  consultationWorkspaceRouteForRole,
+  defaultRouteForRole,
+} from './access'
 
 describe('role route access', () => {
   it('allows patients to enter patient-only routes', () => {
@@ -21,5 +25,10 @@ describe('role route access', () => {
     expect(defaultRouteForRole('patient')).toBe('/')
     expect(defaultRouteForRole('doctor')).toBe('/admin')
     expect(defaultRouteForRole('admin')).toBe('/admin')
+  })
+
+  it('keeps admin scheduling separate from the doctor department pool', () => {
+    expect(consultationWorkspaceRouteForRole('admin')).toBe('/admin/consultations')
+    expect(consultationWorkspaceRouteForRole('doctor')).toBe('/admin/department-pool')
   })
 })

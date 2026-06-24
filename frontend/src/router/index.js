@@ -1,6 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
-import { canAccessRole, defaultRouteForRole } from './access'
+import {
+  canAccessRole,
+  consultationWorkspaceRouteForRole,
+  defaultRouteForRole,
+} from './access'
 import { pinia } from '../stores'
 import { useAuthStore } from '../stores/auth'
 
@@ -107,6 +111,12 @@ const router = createRouter({
           component: () => import('../views/auth/AuthView.vue'),
           meta: { guestOnly: true },
         },
+        {
+          path: 'doctor/apply',
+          name: 'doctor-apply',
+          component: () => import('../views/auth/DoctorApplicationView.vue'),
+          meta: { guestOnly: true },
+        },
       ],
     },
     {
@@ -118,32 +128,65 @@ const router = createRouter({
           path: '',
           name: 'admin-dashboard',
           component: () => import('../views/admin/DashboardView.vue'),
+          meta: { title: '数据概览', roles: ['doctor', 'admin'] },
         },
         {
           path: 'consultations',
           name: 'admin-consultations',
           component: () => import('../views/admin/ConsultationManagementView.vue'),
-          meta: { title: '问诊管理' },
+          meta: { title: '问诊调度', roles: ['admin'] },
+        },
+        {
+          path: 'department-pool',
+          name: 'doctor-department-pool',
+          component: () => import('../views/admin/DoctorDepartmentPoolView.vue'),
+          meta: { title: '科室问诊池', roles: ['doctor'] },
+        },
+        {
+          path: 'my-consultations',
+          name: 'doctor-my-consultations',
+          component: () => import('../views/admin/DoctorMyConsultationsView.vue'),
+          meta: { title: '我的问诊', roles: ['doctor'] },
+        },
+        {
+          path: 'users',
+          name: 'admin-users',
+          component: () => import('../views/admin/PersonnelManagementView.vue'),
+          props: { resource: 'users' },
+          meta: {
+            title: '用户管理',
+            roles: ['admin'],
+          },
+        },
+        {
+          path: 'doctors',
+          name: 'admin-doctors',
+          component: () => import('../views/admin/PersonnelManagementView.vue'),
+          props: { resource: 'doctors' },
+          meta: {
+            title: '医生管理',
+            roles: ['admin'],
+          },
         },
         {
           path: 'knowledge',
           name: 'admin-knowledge',
           component: () => import('../views/admin/ContentManagementView.vue'),
           props: { resource: 'knowledge' },
-          meta: { title: '知识文章' },
+          meta: { title: '养生文章', roles: ['admin'] },
         },
         {
           path: 'recipes',
           name: 'admin-recipes',
           component: () => import('../views/admin/ContentManagementView.vue'),
           props: { resource: 'recipe' },
-          meta: { title: '药膳管理' },
+          meta: { title: '药膳管理', roles: ['admin'] },
         },
         {
           path: 'export',
           name: 'admin-export',
           component: () => import('../views/admin/ExportView.vue'),
-          meta: { title: '数据导出' },
+          meta: { title: '数据导出', roles: ['admin'] },
         },
       ],
     },
@@ -164,6 +207,10 @@ router.beforeEach((to) => {
 
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     return { path: '/login', query: { redirect: to.fullPath } }
+  }
+
+  if (to.name === 'admin-consultations' && auth.role === 'doctor') {
+    return consultationWorkspaceRouteForRole(auth.role)
   }
 
   if (to.meta.roles && !canAccessRole(auth.role, to.meta.roles)) {

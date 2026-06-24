@@ -2,6 +2,8 @@ package com.tcm.platform.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcm.platform.common.Result;
+import com.tcm.platform.dto.PublicationRequest;
+import com.tcm.platform.dto.RecipeAdminRequest;
 import com.tcm.platform.entity.Recipe;
 import com.tcm.platform.service.RecipeService;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -13,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import jakarta.validation.Valid;
 
 /**
  * 医生和管理员管理药膳的接口。
@@ -47,13 +50,27 @@ public class RecipeAdminController {
     }
 
     @PostMapping
-    public Result<Recipe> createRecipe(@RequestBody Recipe recipe) {
-        return Result.success("药膳创建成功", recipeService.createRecipe(recipe));
+    public Result<Recipe> createRecipe(@Valid @RequestBody RecipeAdminRequest request) {
+        return Result.success("药膳创建成功", recipeService.createRecipe(request.toEntity()));
     }
 
     @PutMapping("/{id}")
-    public Result<Recipe> updateRecipe(@PathVariable Long id, @RequestBody Recipe recipe) {
-        return Result.success("药膳更新成功", recipeService.updateRecipe(id, recipe));
+    public Result<Recipe> updateRecipe(
+            @PathVariable Long id,
+            @Valid @RequestBody RecipeAdminRequest request
+    ) {
+        return Result.success("药膳更新成功", recipeService.updateRecipe(id, request.toEntity()));
+    }
+
+    @PutMapping("/{id}/publication")
+    public Result<Recipe> updatePublication(
+            @PathVariable Long id,
+            @Valid @RequestBody PublicationRequest request
+    ) {
+        return Result.success(
+                Boolean.TRUE.equals(request.published()) ? "药膳已发布" : "药膳已取消发布",
+                recipeService.updatePublication(id, request.published())
+        );
     }
 
     @DeleteMapping("/{id}")

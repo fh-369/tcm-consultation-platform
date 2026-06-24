@@ -1,17 +1,26 @@
 <script setup>
-import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import DOMPurify from 'dompurify'
 import MarkdownIt from 'markdown-it'
 import { useRouter } from 'vue-router'
 
-import { askAIStream, getAIRecommendations } from '../../api/content'
+import {
+  askAIStream,
+  createAIConversation,
+  deleteAIConversation,
+  getAIConversation,
+  getAIConversations,
+  importLegacyAIConversation,
+} from '../../api/content'
 import { getMyConsultations } from '../../api/consultation'
 import {
   buildAIContext,
+  buildLegacyImportPayload,
   createAssistantMessage,
   createConversation,
   createUserMessage,
+  normalizeConversation,
   removeConversation,
   removeEmptyConversations,
   summarizeConversation,
@@ -55,10 +64,6 @@ function readConversations() {
   }
 }
 
-function saveConversations() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations.value))
-}
-
 function ensureConversation(seed = '') {
   if (activeConversation.value) {
     return activeConversation.value
@@ -67,20 +72,37 @@ function ensureConversation(seed = '') {
 }
 
 function createNewConversation(seed = '') {
+  conversations.value = conversations.value.filter(
+    (conversation) => conversation.persisted || conversation.messages.length,
+  )
   const conversation = createConversation(seed)
   conversations.value.unshift(conversation)
   activeId.value = conversation.id
+  selectedConsultationId.value = null
   return conversation
 }
 
-function deleteConversation(id) {
+async function deleteConversation(id) {
+  const target = conversations.value.find((conversation) => conversation.id === id)
+  if (target?.persisted) {
+    try {
+      await deleteAIConversation(id)
+    } catch (error) {
+      return ElMessage.error(error.message || '对话删除失败')
+    }
+  }
   const result = removeConversation(conversations.value, id)
   conversations.value = result.conversations.length ? result.conversations : [createConversation()]
   activeId.value = result.activeId || conversations.value[0].id
+  selectedConsultationId.value = activeConversation.value?.consultationId ?? null
 }
 
-function selectConversation(id) {
+async function selectConversation(id) {
   activeId.value = id
+  selectedConsultationId.value = activeConversation.value?.consultationId ?? null
+  if (activeConversation.value?.persisted && !activeConversation.value.messages.length) {
+    await loadConversationDetail(activeConversation.value)
+  }
 }
 
 function setExample(item) {
@@ -106,7 +128,7 @@ function renderMarkdown(content) {
 }
 
 function openRecommendation(item) {
-  router.push(item.type === 'knowledge' ? `/knowledge/${item.id}` : `/recipes/${item.id}`)
+  router.push(`/knowledge/${item.id}`)
 }
 
 function handleComposerKeydown(event) {
@@ -141,6 +163,82 @@ function consultationLabel(item) {
   return `${date} · ${symptom}`
 }
 
+async function persistConversation(conversation, question) {
+  if (conversation.persisted) return conversation
+  const created = normalizeConversation(await createAIConversation({
+    title: summarizeConversation({ ...conversation, messages: [createUserMessage(question)] }),
+    consultationId: selectedConsultationId.value,
+  }))
+  Object.assign(conversation, created)
+  conversation.consultationId = selectedConsultationId.value
+  return conversation
+}
+
+async function loadConversationDetail(conversation, messageCurrent = 1, prepend = false) {
+  const detail = normalizeConversation(await getAIConversation(conversation.id, {
+    messageCurrent,
+    messageSize: 30,
+  }))
+  const existingMessages = conversation.messages || []
+  const expanded = conversation.recommendationsExpanded
+  Object.assign(conversation, detail)
+  conversation.recommendationsExpanded = expanded
+  conversation.messageCurrent = messageCurrent
+  if (prepend) {
+    conversation.messages = [...detail.messages, ...existingMessages]
+  }
+  selectedConsultationId.value = conversation.consultationId ?? null
+}
+
+async function loadEarlierMessages() {
+  if (!activeConversation.value?.persisted || !activeConversation.value.hasMoreMessages) return
+  await loadConversationDetail(
+    activeConversation.value,
+    (activeConversation.value.messageCurrent || 1) + 1,
+    true,
+  )
+}
+
+async function migrateLegacyConversations(savedConversations) {
+  for (const legacy of savedConversations.slice(0, 100)) {
+    const created = await createAIConversation({
+      title: summarizeConversation(legacy),
+      consultationId: legacy.consultationId ?? null,
+      legacyKey: String(legacy.id),
+    })
+    if (!created.messageTotal) {
+      await importLegacyAIConversation(
+        created.id,
+        buildLegacyImportPayload(legacy),
+      )
+    }
+  }
+  localStorage.removeItem(STORAGE_KEY)
+  const page = await getAIConversations({ current: 1, size: 20 })
+  return (page.records || []).map(normalizeConversation)
+}
+
+async function loadConversations() {
+  try {
+    const page = await getAIConversations({ current: 1, size: 20 })
+    let loaded = (page.records || []).map(normalizeConversation)
+    const legacy = removeEmptyConversations(readConversations())
+    if (legacy.length) {
+      loaded = await migrateLegacyConversations(legacy)
+    }
+    conversations.value = loaded.length ? loaded : [createConversation()]
+    activeId.value = conversations.value[0].id
+    selectedConsultationId.value = activeConversation.value?.consultationId ?? null
+    if (activeConversation.value?.persisted) {
+      await loadConversationDetail(activeConversation.value)
+    }
+  } catch (error) {
+    conversations.value = [createConversation()]
+    activeId.value = conversations.value[0].id
+    ElMessage.error(error.message || 'AI 对话记录加载失败')
+  }
+}
+
 async function loadConsultations() {
   try {
     const page = await getMyConsultations({ current: 1, size: 20 })
@@ -161,13 +259,17 @@ async function submit() {
   if (!question) return ElMessage.warning('请先输入想了解的问题')
 
   const conversation = ensureConversation(question)
+  try {
+    await persistConversation(conversation, question)
+  } catch (error) {
+    return ElMessage.error(error.message || '对话创建失败')
+  }
   const context = buildAIContext(conversation.messages)
   appendMessage(conversation, createUserMessage(question))
   const assistantMessage = reactive(createAssistantMessage('', {
     disclaimer: '本回答仅供一般养护参考，不能替代医生诊断和治疗。',
   }))
   assistantMessage.streaming = true
-  assistantMessage.recommendations = []
   const renderedAssistantMessage = appendMessage(conversation, assistantMessage)
   const controller = new AbortController()
   activeRequest.value = {
@@ -180,7 +282,8 @@ async function submit() {
     await askAIStream({
       question,
       context,
-      consultationId: selectedConsultationId.value,
+      consultationId: conversation.consultationId,
+      conversationId: conversation.id,
       onChunk: (chunk) => {
         const shouldFollow = isNearMessageBottom()
         receivedAnswer += chunk
@@ -194,11 +297,6 @@ async function submit() {
     if (!receivedAnswer.trim() && !renderedAssistantMessage.content.trim()) {
       renderedAssistantMessage.fallback = true
       renderedAssistantMessage.content = '暂时无法获取智能回答。建议保持规律作息、均衡饮食和适量运动；如症状严重、持续不缓解或出现明显不适，请及时就医。'
-    }
-    try {
-      renderedAssistantMessage.recommendations = await getAIRecommendations(question)
-    } catch {
-      renderedAssistantMessage.recommendations = []
     }
   } catch (error) {
     if (error.name === 'AbortError') {
@@ -216,18 +314,19 @@ async function submit() {
       activeRequest.value = null
     }
     touchConversation(conversation)
+    try {
+      await loadConversationDetail(conversation)
+    } catch {
+      // The streamed answer remains visible even if refreshing persisted metadata fails.
+    }
   }
 }
 
-onMounted(() => {
-  const savedConversations = removeEmptyConversations(readConversations())
-  conversations.value = savedConversations.length ? savedConversations : [createConversation()]
-  activeId.value = conversations.value[0].id
+onMounted(async () => {
+  await loadConversations()
   loadConsultations()
   scrollToLatest()
 })
-
-watch(conversations, saveConversations, { deep: true })
 </script>
 
 <template>
@@ -255,7 +354,7 @@ watch(conversations, saveConversations, { deep: true })
           >
             <button class="conversation-select" type="button" @click="selectConversation(conversation.id)">
               <strong>{{ summarizeConversation(conversation) }}</strong>
-              <span>{{ conversation.messages.length ? `${conversation.messages.length} 条消息` : '尚未开始' }}</span>
+              <span>{{ conversation.messageTotal || conversation.messages.length ? `${conversation.messageTotal || conversation.messages.length} 条消息` : '尚未开始' }}</span>
             </button>
             <button class="delete-chat" type="button" aria-label="删除对话" @click.stop="deleteConversation(conversation.id)">删除</button>
           </div>
@@ -276,6 +375,7 @@ watch(conversations, saveConversations, { deep: true })
               filterable
               placeholder="选择问诊单（可选）"
               size="large"
+              :disabled="Boolean(activeConversation?.persisted)"
             >
               <el-option
                 v-for="item in consultations"
@@ -288,6 +388,14 @@ watch(conversations, saveConversations, { deep: true })
         </div>
 
         <div ref="messagesRef" class="messages">
+          <button
+            v-if="activeConversation?.hasMoreMessages"
+            class="load-earlier"
+            type="button"
+            @click="loadEarlierMessages"
+          >
+            加载更早消息
+          </button>
           <div v-if="!activeMessages.length" class="empty-state">
             <p>可以从一个具体问题开始</p>
             <span>尽量说清楚场景、持续时间和你想追问的方向。</span>
@@ -310,15 +418,35 @@ watch(conversations, saveConversations, { deep: true })
               class="stream-cursor"
               aria-hidden="true"
             ></i>
-            <div v-if="message.recommendations?.length" class="message-recommendations">
-              <strong>站内延伸阅读</strong>
+            <footer v-if="message.disclaimer">{{ message.disclaimer }}</footer>
+          </article>
+
+          <section
+            v-if="activeConversation?.recommendations?.length"
+            class="conversation-recommendations"
+          >
+            <button
+              class="recommendation-toggle"
+              type="button"
+              @click="activeConversation.recommendationsExpanded = !activeConversation.recommendationsExpanded"
+            >
+              <span>
+                <b>站内延伸阅读</b>
+                <small>根据本对话首次提问智能匹配 {{ activeConversation.recommendations.length }} 篇养生文章</small>
+              </span>
+              <i aria-hidden="true">{{ activeConversation.recommendationsExpanded ? '收起' : '展开' }}</i>
+            </button>
+            <div
+              v-if="activeConversation.recommendationsExpanded"
+              class="recommendation-list"
+            >
               <button
-                v-for="item in message.recommendations"
+                v-for="item in activeConversation.recommendations"
                 :key="`${item.type}-${item.id}`"
                 type="button"
                 @click="openRecommendation(item)"
               >
-                <span>{{ item.type === 'knowledge' ? '养生知识' : '药膳推荐' }}</span>
+                <span>养生知识</span>
                 <div>
                   <b>{{ item.title }}</b>
                   <small v-if="item.description">{{ item.description }}</small>
@@ -326,8 +454,7 @@ watch(conversations, saveConversations, { deep: true })
                 <i aria-hidden="true">→</i>
               </button>
             </div>
-            <footer v-if="message.disclaimer">{{ message.disclaimer }}</footer>
-          </article>
+          </section>
         </div>
 
         <div class="composer-wrap">
@@ -387,6 +514,7 @@ watch(conversations, saveConversations, { deep: true })
 .messages { display: flex; flex-direction: column; gap: 14px; overflow-y: auto; padding: 18px 22px; background:
   radial-gradient(circle at 12% 10%, rgb(79 138 108 / 8%), transparent 24%),
   linear-gradient(180deg, rgb(250 253 250 / 72%), rgb(246 251 247 / 92%)); }
+.load-earlier { align-self: center; padding: 8px 16px; border: 1px solid rgb(79 138 108 / 18%); border-radius: 999px; background: rgb(255 255 255 / 88%); color: var(--color-ink); cursor: pointer; font-size: 12px; font-weight: 800; }
 .empty-state { margin: auto; max-width: 560px; text-align: center; }
 .empty-state p { margin: 0; color: var(--color-ink); font-family: "Noto Serif SC", "STSong", serif; font-size: 30px; font-weight: 800; }
 .empty-state span { display: block; margin-top: 10px; color: var(--color-text-muted); line-height: 1.8; }
@@ -426,15 +554,20 @@ watch(conversations, saveConversations, { deep: true })
 .markdown-body :deep(pre code) { padding: 0; background: transparent; color: inherit; }
 .stream-cursor { display: inline-block; width: 8px; height: 18px; margin: 6px 0 0 2px; border-radius: 999px; background: var(--color-cinnabar); animation: stream-cursor-blink .9s infinite; vertical-align: text-bottom; }
 @keyframes stream-cursor-blink { 0%, 45% { opacity: 1; } 46%, 100% { opacity: .18; } }
-.message-recommendations { display: grid; gap: 8px; margin-top: 16px; padding-top: 14px; border-top: 1px solid rgb(79 138 108 / 12%); }
-.message-recommendations > strong { margin: 0 0 2px; color: var(--color-ink); font-size: 12px; letter-spacing: .08em; }
-.message-recommendations button { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; width: 100%; padding: 11px 12px; border: 1px solid rgb(79 138 108 / 14%); border-radius: 16px; background: linear-gradient(135deg, rgb(248 252 249 / 96%), rgb(240 248 243 / 90%)); color: #405e51; cursor: pointer; text-align: left; transition: .18s ease; }
-.message-recommendations button:hover { border-color: rgb(79 138 108 / 34%); box-shadow: 0 9px 20px rgb(23 60 45 / 8%); transform: translateY(-1px); }
-.message-recommendations button > span { margin: 0; padding: 5px 8px; border-radius: 999px; background: rgb(79 138 108 / 11%); color: var(--color-ink); font-size: 10px; letter-spacing: 0; white-space: nowrap; }
-.message-recommendations button div { min-width: 0; }
-.message-recommendations button b { display: block; overflow: hidden; color: var(--color-ink); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
-.message-recommendations button small { display: -webkit-box; overflow: hidden; margin-top: 4px; color: var(--color-text-muted); font-size: 11px; line-height: 1.55; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-.message-recommendations button > i { color: var(--color-cinnabar); font-size: 16px; font-style: normal; }
+.conversation-recommendations { width: min(78%, 760px); padding: 10px; border: 1px solid rgb(79 138 108 / 16%); border-radius: 22px; background: rgb(255 255 255 / 84%); box-shadow: 0 12px 28px rgb(23 60 45 / 7%); }
+.recommendation-toggle { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; padding: 10px 12px; border: 0; background: transparent; color: var(--color-ink); cursor: pointer; text-align: left; }
+.recommendation-toggle span { min-width: 0; }
+.recommendation-toggle b { display: block; font-size: 14px; }
+.recommendation-toggle small { display: block; margin-top: 4px; color: var(--color-text-muted); font-size: 11px; line-height: 1.5; }
+.recommendation-toggle > i { flex: 0 0 auto; padding: 6px 10px; border-radius: 999px; background: rgb(79 138 108 / 10%); color: var(--color-ink); font-size: 11px; font-style: normal; font-weight: 800; }
+.recommendation-list { display: grid; gap: 8px; padding: 4px 4px 2px; }
+.recommendation-list > button { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; width: 100%; padding: 11px 12px; border: 1px solid rgb(79 138 108 / 14%); border-radius: 16px; background: linear-gradient(135deg, rgb(248 252 249 / 96%), rgb(240 248 243 / 90%)); color: #405e51; cursor: pointer; text-align: left; transition: .18s ease; }
+.recommendation-list > button:hover { border-color: rgb(79 138 108 / 34%); box-shadow: 0 9px 20px rgb(23 60 45 / 8%); transform: translateY(-1px); }
+.recommendation-list > button > span { margin: 0; padding: 5px 8px; border-radius: 999px; background: rgb(79 138 108 / 11%); color: var(--color-ink); font-size: 10px; letter-spacing: 0; white-space: nowrap; }
+.recommendation-list > button div { min-width: 0; }
+.recommendation-list > button b { display: block; overflow: hidden; color: var(--color-ink); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.recommendation-list > button small { display: -webkit-box; overflow: hidden; margin-top: 4px; color: var(--color-text-muted); font-size: 11px; line-height: 1.55; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.recommendation-list > button > i { color: var(--color-cinnabar); font-size: 16px; font-style: normal; }
 .message footer { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgb(79 138 108 / 12%); color: var(--color-text-muted); font-size: 11px; line-height: 1.7; }
 .thinking .typing-placeholder { color: var(--color-text-muted); }
 .composer-wrap { padding: 10px 16px 14px; border-top: 1px solid rgb(79 138 108 / 12%); background: rgb(255 255 255 / 92%); }

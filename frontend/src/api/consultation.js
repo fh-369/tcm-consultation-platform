@@ -17,3 +17,11 @@ export async function createConsultation(payload) {
 export async function getMyConsultations(params) {
   return unwrapResult(await request.get('/patient/consultation/my', { params }))
 }
+
+export async function getConsultationMessages(id) {
+  return unwrapResult(await request.get(`/patient/consultation/${id}/messages`))
+}
+
+export async function sendConsultationMessage(id, content) {
+  return unwrapResult(await request.post(`/patient/consultation/${id}/messages`, { content }))
+}

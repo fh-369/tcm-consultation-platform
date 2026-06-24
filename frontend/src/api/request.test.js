@@ -61,7 +61,7 @@ describe('authenticated request client', () => {
     expect(response.config.headers.Authorization).toBeUndefined()
   })
 
-  it('clears stale login state and redirects to login when the API returns 403', async () => {
+  it('clears stale login state and redirects to login when the API returns 401', async () => {
     const removeItem = vi.fn()
     const assign = vi.fn()
     vi.stubGlobal('window', {
@@ -84,8 +84,8 @@ describe('authenticated request client', () => {
     await expect(request.get('/protected-resource', {
       adapter: async (config) => Promise.reject({
         config,
-        message: 'Request failed with status code 403',
-        response: { status: 403 },
+        message: 'Request failed with status code 401',
+        response: { status: 401 },
       }),
     })).rejects.toMatchObject({
       message: '登录已过期，请重新登录',
@@ -94,5 +94,43 @@ describe('authenticated request client', () => {
     expect(removeItem).toHaveBeenCalledWith('tcm-auth-session')
     expect(ElMessage.warning).toHaveBeenCalledWith('登录已过期，请重新登录')
     expect(assign).toHaveBeenCalledWith('/login')
+  })
+
+  it('keeps a valid session when the API returns 403 for insufficient permission', async () => {
+    const removeItem = vi.fn()
+    const assign = vi.fn()
+    vi.stubGlobal('window', {
+      localStorage: {
+        getItem: () =>
+          JSON.stringify({
+            token: 'valid-token',
+            role: 'patient',
+            userId: 7,
+            displayName: '林女士',
+          }),
+        removeItem,
+      },
+      location: {
+        pathname: '/admin',
+        assign,
+      },
+    })
+
+    await expect(request.get('/admin/dashboard', {
+      adapter: async (config) => Promise.reject({
+        config,
+        message: 'Request failed with status code 403',
+        response: {
+          status: 403,
+          data: { message: '当前账号无权执行此操作' },
+        },
+      }),
+    })).rejects.toMatchObject({
+      message: '当前账号无权执行此操作',
+    })
+
+    expect(removeItem).not.toHaveBeenCalled()
+    expect(assign).not.toHaveBeenCalled()
+    expect(ElMessage.warning).toHaveBeenCalledWith('当前账号无权执行此操作')
   })
 })

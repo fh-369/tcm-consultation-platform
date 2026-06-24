@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  isCrossDepartmentConsultation,
   reminderDisplay,
   statusDisplay,
   urgencyDisplay,
@@ -23,5 +24,20 @@ describe('consultation display rules', () => {
     expect(urgencyDisplay('非常紧急').tone).toBe('urgent')
     expect(reminderDisplay('urgent').label).toBe('优先提醒')
     expect(reminderDisplay('attention').tone).toBe('attention')
+  })
+
+  it('detects cross-department handling without flagging general consultation', () => {
+    expect(isCrossDepartmentConsultation({
+      departmentName: '中医妇科',
+      doctorDepartment: '中医内科',
+    })).toBe(true)
+    expect(isCrossDepartmentConsultation({
+      departmentName: '中医内科',
+      doctorDepartment: '中医内科',
+    })).toBe(false)
+    expect(isCrossDepartmentConsultation({
+      departmentName: '综合咨询',
+      doctorDepartment: '中医内科',
+    })).toBe(false)
   })
 })

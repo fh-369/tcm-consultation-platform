@@ -8,12 +8,19 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * 药膳公开查询与后台管理业务。
  */
 @Service
 public class RecipeService {
+
+    private static final Set<String> SEASONS = Set.of("春", "夏", "秋", "冬", "四季");
+    private static final Set<String> CONSTITUTIONS = Set.of(
+            "通用", "平和质", "气虚质", "阳虚质", "阴虚质",
+            "痰湿质", "湿热质", "血瘀质", "气郁质", "特禀质"
+    );
 
     private final RecipeMapper recipeMapper;
 
@@ -78,6 +85,8 @@ public class RecipeService {
     public Recipe createRecipe(Recipe recipe) {
         validateRecipe(recipe);
         recipe.setId(null);
+        normalizeRecipe(recipe);
+        validateOptions(recipe);
         recipe.setPublished(Boolean.TRUE.equals(recipe.getPublished()));
         recipe.setViewCount(recipe.getViewCount() == null ? 0 : recipe.getViewCount());
 
@@ -91,6 +100,8 @@ public class RecipeService {
     public Recipe updateRecipe(Long id, Recipe request) {
         Recipe recipe = getRecipe(id);
         validateRecipe(request);
+        normalizeRecipe(request);
+        validateOptions(request);
 
         recipe.setName(request.getName());
         recipe.setSeason(request.getSeason());
@@ -104,6 +115,19 @@ public class RecipeService {
 
         if (recipeMapper.updateById(recipe) != 1) {
             throw new IllegalStateException("更新药膳失败");
+        }
+        return recipe;
+    }
+
+    @Transactional
+    public Recipe updatePublication(Long id, Boolean published) {
+        Recipe recipe = getRecipe(id);
+        if (Boolean.TRUE.equals(published)) {
+            validatePublishedRecipe(recipe);
+        }
+        recipe.setPublished(Boolean.TRUE.equals(published));
+        if (recipeMapper.updateById(recipe) != 1) {
+            throw new IllegalStateException("更新药膳发布状态失败");
         }
         return recipe;
     }
@@ -123,12 +147,45 @@ public class RecipeService {
         if (!hasText(recipe.getName())) {
             throw new IllegalArgumentException("药膳名称不能为空");
         }
-        if (!hasText(recipe.getIngredients())) {
+        if (Boolean.TRUE.equals(recipe.getPublished()) && !hasText(recipe.getIngredients())) {
             throw new IllegalArgumentException("药膳食材不能为空");
         }
-        if (!hasText(recipe.getSteps())) {
+        if (Boolean.TRUE.equals(recipe.getPublished()) && !hasText(recipe.getSteps())) {
             throw new IllegalArgumentException("药膳制作步骤不能为空");
         }
+    }
+
+    private void validatePublishedRecipe(Recipe recipe) {
+        if (!hasText(recipe.getIngredients())) {
+            throw new IllegalArgumentException("药膳食材不能为空，无法发布");
+        }
+        if (!hasText(recipe.getSteps())) {
+            throw new IllegalArgumentException("药膳制作步骤不能为空，无法发布");
+        }
+    }
+
+    private void normalizeRecipe(Recipe recipe) {
+        recipe.setName(trim(recipe.getName()));
+        recipe.setSeason(trim(recipe.getSeason()));
+        recipe.setConstitution(trim(recipe.getConstitution()));
+        recipe.setSuitableFor(trim(recipe.getSuitableFor()));
+        recipe.setSummary(trim(recipe.getSummary()));
+        recipe.setIngredients(trim(recipe.getIngredients()));
+        recipe.setSteps(trim(recipe.getSteps()));
+        recipe.setImageUrl(trim(recipe.getImageUrl()));
+    }
+
+    private void validateOptions(Recipe recipe) {
+        if (hasText(recipe.getSeason()) && !SEASONS.contains(recipe.getSeason())) {
+            throw new IllegalArgumentException("请选择有效的适用季节");
+        }
+        if (hasText(recipe.getConstitution()) && !CONSTITUTIONS.contains(recipe.getConstitution())) {
+            throw new IllegalArgumentException("请选择有效的适用体质");
+        }
+    }
+
+    private String trim(String value) {
+        return value == null ? null : value.trim();
     }
 
     private void validatePage(long current, long size) {

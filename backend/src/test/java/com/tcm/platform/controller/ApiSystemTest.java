@@ -4,27 +4,40 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcm.platform.config.SecurityConfig;
 import com.tcm.platform.dto.AIAnswerResponse;
 import com.tcm.platform.dto.AIContentRecommendation;
+import com.tcm.platform.dto.ConsultationExportFilter;
 import com.tcm.platform.dto.DashboardSummary;
 import com.tcm.platform.dto.LoginResponse;
+import com.tcm.platform.dto.PersonnelRecord;
+import com.tcm.platform.entity.Account;
 import com.tcm.platform.entity.Consultation;
+import com.tcm.platform.entity.ConsultationMessage;
 import com.tcm.platform.entity.KnowledgeArticle;
 import com.tcm.platform.entity.PatientAccount;
 import com.tcm.platform.entity.Recipe;
 import com.tcm.platform.entity.User;
 import com.tcm.platform.mapper.AccountMapper;
+import com.tcm.platform.mapper.AIConversationMapper;
+import com.tcm.platform.mapper.AIConversationRecommendationMapper;
+import com.tcm.platform.mapper.AIMessageMapper;
+import com.tcm.platform.mapper.DepartmentMapper;
 import com.tcm.platform.mapper.PatientAccountMapper;
 import com.tcm.platform.mapper.ConsultationMapper;
+import com.tcm.platform.mapper.ConsultationMessageMapper;
 import com.tcm.platform.mapper.KnowledgeArticleMapper;
 import com.tcm.platform.mapper.RecipeMapper;
 import com.tcm.platform.mapper.UploadMapper;
 import com.tcm.platform.mapper.UserMapper;
 import com.tcm.platform.security.JwtUtil;
 import com.tcm.platform.service.AIService;
+import com.tcm.platform.service.AIConversationService;
 import com.tcm.platform.service.AuthService;
 import com.tcm.platform.service.ConsultationExportService;
 import com.tcm.platform.service.ConsultationService;
+import com.tcm.platform.service.ConsultationMessageService;
+import com.tcm.platform.service.ConsultationWorkspaceService;
 import com.tcm.platform.service.DashboardService;
 import com.tcm.platform.service.KnowledgeArticleService;
+import com.tcm.platform.service.PersonnelService;
 import com.tcm.platform.service.RecipeService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,8 +74,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         AuthController.class,
         PatientController.class,
         AdminController.class,
+        DoctorConsultationController.class,
         RecipeAdminController.class,
         DashboardController.class,
+        PersonnelController.class,
         AIController.class
 })
 @Import(SecurityConfig.class)
@@ -81,6 +96,12 @@ class ApiSystemTest {
     private ConsultationService consultationService;
 
     @MockBean
+    private ConsultationWorkspaceService consultationWorkspaceService;
+
+    @MockBean
+    private ConsultationMessageService consultationMessageService;
+
+    @MockBean
     private KnowledgeArticleService knowledgeArticleService;
 
     @MockBean
@@ -96,7 +117,22 @@ class ApiSystemTest {
     private AIService aiService;
 
     @MockBean
+    private AIConversationService aiConversationService;
+
+    @MockBean
+    private PersonnelService personnelService;
+
+    @MockBean
     private AccountMapper accountMapper;
+
+    @MockBean
+    private AIConversationMapper aiConversationMapper;
+
+    @MockBean
+    private AIConversationRecommendationMapper aiConversationRecommendationMapper;
+
+    @MockBean
+    private AIMessageMapper aiMessageMapper;
 
     @MockBean
     private PatientAccountMapper patientAccountMapper;
@@ -105,7 +141,13 @@ class ApiSystemTest {
     private UserMapper userMapper;
 
     @MockBean
+    private DepartmentMapper departmentMapper;
+
+    @MockBean
     private ConsultationMapper consultationMapper;
+
+    @MockBean
+    private ConsultationMessageMapper consultationMessageMapper;
 
     @MockBean
     private KnowledgeArticleMapper knowledgeArticleMapper;
@@ -198,6 +240,7 @@ class ApiSystemTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
+                                  "departmentId":2,
                                   "patientName":"李女士",
                                   "age":35,
                                   "gender":"女",
@@ -236,11 +279,12 @@ class ApiSystemTest {
             consumer.accept("建议先清淡饮食。");
             return null;
         }).when(aiService).streamAnswer(eq("结合问诊单怎么调养？"), any(), eq(8L), eq(10L), any());
+        when(aiConversationService.buildContext(22L, 8L)).thenReturn(List.of());
 
         var mvcResult = mockMvc.perform(post("/api/patient/ai/question/stream")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"question":"结合问诊单怎么调养？","consultationId":10}
+                                {"conversationId":22,"question":"结合问诊单怎么调养？","consultationId":10}
                                 """))
                 .andExpect(request().asyncStarted())
                 .andReturn();
@@ -253,7 +297,11 @@ class ApiSystemTest {
     @Test
     @WithMockUser(username = "patient1", roles = "PATIENT")
     void patientCanLoadAIContentRecommendations() throws Exception {
-        when(aiService.findRecommendations("胃口不好怎么调养？")).thenReturn(List.of(
+        PatientAccount patient = new PatientAccount();
+        patient.setId(8L);
+        patient.setUsername("patient1");
+        when(patientAccountMapper.selectOne(any())).thenReturn(patient);
+        when(aiService.findRecommendations("胃口不好怎么调养？", 8L, null)).thenReturn(List.of(
                 new AIContentRecommendation(6L, "knowledge", "一餐如何吃得更均衡", "从食物种类开始调整。"),
                 new AIContentRecommendation(9L, "recipe", "山药香菇鸡肉粥", "适合作为清淡日常一餐。")
         ));
@@ -306,10 +354,13 @@ class ApiSystemTest {
     @Test
     void protectedEndpointsRejectAnonymousAccess() throws Exception {
         mockMvc.perform(get("/api/patient/consultation/my"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(401))
+                .andExpect(jsonPath("$.message").value("登录状态无效，请重新登录"));
 
         mockMvc.perform(get("/api/admin/dashboard"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(401));
     }
 
     @Test
@@ -326,7 +377,39 @@ class ApiSystemTest {
     @WithMockUser(username = "patient1", roles = "PATIENT")
     void patientCannotAccessAdminEndpoints() throws Exception {
         mockMvc.perform(get("/api/admin/dashboard"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value(403))
+                .andExpect(jsonPath("$.message").value("当前账号无权执行此操作"));
+
+        mockMvc.perform(post("/api/admin/knowledge")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"title":"无权创建","content":"正文"}
+                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value(403));
+
+        mockMvc.perform(get("/api/doctor/consultations/mine"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("当前账号无权执行此操作"));
+    }
+
+    @Test
+    @WithMockUser(username = "doctor1", roles = "DOCTOR")
+    void doctorCannotAccessPersonnelManagementEndpoints() throws Exception {
+        mockMvc.perform(get("/api/admin/personnel/users"))
                 .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/admin/personnel/doctors"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "doctor1", roles = "DOCTOR")
+    void doctorCannotAccessPatientOrAdministratorManagementEndpoints() throws Exception {
+        mockMvc.perform(get("/api/patient/consultation/my"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value(403));
 
         mockMvc.perform(post("/api/admin/knowledge")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -334,6 +417,226 @@ class ApiSystemTest {
                                 {"title":"无权创建","content":"正文"}
                                 """))
                 .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/admin/export/consultations"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/admin/export/consultations/count"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "doctor1", roles = "DOCTOR")
+    void doctorDashboardUsesOnlyPersonalStatistics() throws Exception {
+        User doctor = new User();
+        doctor.setId(6L);
+        doctor.setUsername("doctor1");
+        doctor.setRole("doctor");
+        when(userMapper.selectOne(any())).thenReturn(doctor);
+        when(dashboardService.getDoctorSummary(6L)).thenReturn(new DashboardSummary(
+                "doctor",
+                List.of(Map.of("status", "接诊中", "count", 2)),
+                List.of(Map.of("urgency", "普通", "count", 2)),
+                List.of(Map.of("month", "2026-06", "count", 2)),
+                Map.of("assignedTotal", 2L),
+                List.of(),
+                List.of()
+        ));
+        when(dashboardService.getTrend("week", 6L)).thenReturn(
+                List.of(Map.of("period", "2026-06-16", "count", 2))
+        );
+
+        mockMvc.perform(get("/api/admin/dashboard"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.scope").value("doctor"))
+                .andExpect(jsonPath("$.data.metrics.assignedTotal").value(2));
+
+        mockMvc.perform(get("/api/admin/dashboard/trend").param("period", "week"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].count").value(2));
+
+        verify(dashboardService).getDoctorSummary(6L);
+        verify(dashboardService).getTrend("week", 6L);
+    }
+
+    @Test
+    @WithMockUser(username = "doctor1", roles = "DOCTOR")
+    void doctorUsesDedicatedWorkspacesAndCannotEnterAdminScheduling() throws Exception {
+        User doctor = new User();
+        doctor.setId(6L);
+        doctor.setUsername("doctor1");
+        doctor.setRole("doctor");
+        doctor.setDepartmentId(2L);
+        when(userMapper.selectOne(any())).thenReturn(doctor);
+        when(consultationWorkspaceService.listDepartmentPool(
+                1, 10, "紧急", "胃痛", "all", 6L
+        ))
+                .thenReturn(new Page<>());
+        when(consultationWorkspaceService.listMine(1, 10, "接诊中", null, null, 6L))
+                .thenReturn(new Page<>());
+        Consultation claimed = new Consultation();
+        claimed.setId(9L);
+        claimed.setDoctorId(6L);
+        when(consultationWorkspaceService.claim(9L, 6L)).thenReturn(claimed);
+
+        mockMvc.perform(get("/api/doctor/consultations/pool")
+                        .param("urgency", "紧急")
+                        .param("keyword", "胃痛")
+                        .param("scope", "all"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/doctor/consultations/mine")
+                        .param("status", "接诊中"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(put("/api/doctor/consultations/9/claim"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.doctorId").value(6));
+
+        mockMvc.perform(get("/api/admin/consultation"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(put("/api/admin/consultation/9/assignment")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"doctorId":7}
+                                """))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(put("/api/admin/consultation/9/department")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"departmentId":3}
+                                """))
+                .andExpect(status().isForbidden());
+
+        verify(consultationWorkspaceService)
+                .listDepartmentPool(1, 10, "紧急", "胃痛", "all", 6L);
+        verify(consultationWorkspaceService)
+                .listMine(1, 10, "接诊中", null, null, 6L);
+    }
+
+    @Test
+    @WithMockUser(username = "patient1", roles = "PATIENT")
+    void patientCanReadAndSendMessagesForOwnConsultation() throws Exception {
+        PatientAccount patient = new PatientAccount();
+        patient.setId(8L);
+        patient.setUsername("patient1");
+        patient.setDisplayName("李女士");
+        ConsultationMessage message = new ConsultationMessage();
+        message.setId(21L);
+        message.setSenderType("doctor");
+        message.setContent("请继续观察。");
+        when(patientAccountMapper.selectOne(any())).thenReturn(patient);
+        when(consultationMessageService.listForPatient(9L, 8L))
+                .thenReturn(List.of(message));
+        when(consultationMessageService.sendAsPatient(
+                eq(9L), eq(8L), eq("李女士"), any()
+        )).thenReturn(message);
+
+        mockMvc.perform(get("/api/patient/consultation/9/messages"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].content").value("请继续观察。"));
+
+        mockMvc.perform(post("/api/patient/consultation/9/messages")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"content":"今天感觉好一些了。"}
+                                """))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(username = "doctor1", roles = "DOCTOR")
+    void doctorCanReadAndSendMessagesOnlyThroughDoctorEndpoint() throws Exception {
+        User doctor = new User();
+        doctor.setId(6L);
+        doctor.setUsername("doctor1");
+        doctor.setDisplayName("张医生");
+        doctor.setRole("doctor");
+        ConsultationMessage message = new ConsultationMessage();
+        message.setId(22L);
+        message.setSenderType("patient");
+        message.setContent("今天感觉好一些了。");
+        when(userMapper.selectOne(any())).thenReturn(doctor);
+        when(consultationMessageService.listForDoctor(9L, 6L))
+                .thenReturn(List.of(message));
+        when(consultationMessageService.sendAsDoctor(
+                eq(9L), eq(6L), eq("张医生"), any()
+        )).thenReturn(message);
+
+        mockMvc.perform(get("/api/doctor/consultations/9/messages"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].content").value("今天感觉好一些了。"));
+
+        mockMvc.perform(post("/api/doctor/consultations/9/messages")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"content":"请继续保持清淡饮食。"}
+                                """))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/patient/consultation/9/messages"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void adminCanAssignButCannotClaimConsultations() throws Exception {
+        Consultation assigned = new Consultation();
+        assigned.setId(9L);
+        assigned.setDoctorId(6L);
+        when(consultationWorkspaceService.assign(9L, 6L)).thenReturn(assigned);
+        Consultation changedDepartment = new Consultation();
+        changedDepartment.setId(9L);
+        changedDepartment.setDepartmentId(3L);
+        changedDepartment.setDepartmentName("中医妇科");
+        when(consultationWorkspaceService.updateDepartment(9L, 3L))
+                .thenReturn(changedDepartment);
+
+        mockMvc.perform(put("/api/admin/consultation/9/assignment")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"doctorId":6}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.doctorId").value(6));
+
+        mockMvc.perform(put("/api/admin/consultation/9/claim"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/doctor/consultations/mine"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value(403));
+
+        mockMvc.perform(put("/api/admin/consultation/9/department")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"departmentId":3}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.departmentName").value("中医妇科"));
+    }
+
+    @Test
+    @WithMockUser(username = "doctor1", roles = "DOCTOR")
+    void doctorBusinessErrorsRemainVisibleToTheClient() throws Exception {
+        User doctor = new User();
+        doctor.setId(6L);
+        doctor.setUsername("doctor1");
+        doctor.setRole("doctor");
+        when(userMapper.selectOne(any())).thenReturn(doctor);
+        when(consultationWorkspaceService.updateAsDoctor(eq(9L), any(), eq(6L)))
+                .thenThrow(new IllegalArgumentException("该问诊单未分配给当前医生"));
+
+        mockMvc.perform(put("/api/doctor/consultations/9")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"status":"接诊中"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("该问诊单未分配给当前医生"));
     }
 
     @Test
@@ -343,21 +646,36 @@ class ApiSystemTest {
         admin.setId(1L);
         admin.setUsername("admin");
         when(userMapper.selectOne(any())).thenReturn(admin);
-        when(dashboardService.getSummary()).thenReturn(new DashboardSummary(
+        when(dashboardService.getAdminSummary()).thenReturn(new DashboardSummary(
+                "platform",
                 List.of(Map.of("status", "待接诊", "count", 2)),
                 List.of(Map.of("urgency", "普通", "count", 2)),
-                List.of(Map.of("month", "2026-06", "count", 2))
+                List.of(Map.of("month", "2026-06", "count", 2)),
+                Map.of("registeredPatients", 8L),
+                List.of(Map.of("department", "中医内科", "count", 2)),
+                List.of(Map.of("doctorName", "李医生", "activeCount", 1))
         ));
+        when(dashboardService.getTrend("week", null)).thenReturn(
+                List.of(Map.of("period", "2026-06-16", "count", 2))
+        );
         when(knowledgeArticleService.listArticles(anyLong(), anyLong(), any(), any(), any()))
                 .thenReturn(new Page<>());
         when(recipeService.listRecipes(anyLong(), anyLong(), any(), any(), any(), any()))
                 .thenReturn(new Page<>());
-        when(consultationExportService.exportCsv())
+        when(consultationExportService.count(any(ConsultationExportFilter.class)))
+                .thenReturn(1L);
+        when(consultationExportService.exportCsv(any(ConsultationExportFilter.class)))
                 .thenReturn("\uFEFF问诊ID,患者姓名\n".getBytes(StandardCharsets.UTF_8));
 
         mockMvc.perform(get("/api/admin/dashboard"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.scope").value("platform"))
                 .andExpect(jsonPath("$.data.statusDistribution[0].status").value("待接诊"));
+
+        mockMvc.perform(get("/api/admin/dashboard/trend").param("period", "week"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].period").value("2026-06-16"))
+                .andExpect(jsonPath("$.data[0].count").value(2));
 
         mockMvc.perform(get("/api/admin/knowledge"))
                 .andExpect(status().isOk());
@@ -365,11 +683,58 @@ class ApiSystemTest {
         mockMvc.perform(get("/api/admin/recipe"))
                 .andExpect(status().isOk());
 
+        mockMvc.perform(get("/api/admin/export/consultations/count")
+                        .param("status", "待接诊"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value(1));
+
         mockMvc.perform(get("/api/admin/export/consultations"))
                 .andExpect(status().isOk())
-                .andExpect(header().string("Content-Disposition", "attachment; filename=\"consultations.csv\""))
+                .andExpect(header().string(
+                        "Content-Disposition",
+                        "attachment; filename=\"consultations-all-to-all.csv\""
+                ))
                 .andExpect(content().contentType("text/csv;charset=UTF-8"))
                 .andExpect(content().bytes("\uFEFF问诊ID,患者姓名\n".getBytes(StandardCharsets.UTF_8)));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void adminCanListPersonnelAndUpdateAccountStatus() throws Exception {
+        PersonnelRecord patient = new PersonnelRecord();
+        patient.setId(8L);
+        patient.setUsername("patient1");
+        patient.setDisplayName("小林");
+        patient.setRole("patient");
+        patient.setEnabled(true);
+        Page<PersonnelRecord> page = new Page<>(1, 10);
+        page.setRecords(List.of(patient));
+        page.setTotal(1);
+        Account account = new Account();
+        account.setId(8L);
+        account.setUsername("patient1");
+        account.setEnabled(false);
+        when(personnelService.listPatients(1, 10, "小林")).thenReturn(page);
+        when(personnelService.updateEnabled(8L, false, "admin")).thenReturn(account);
+
+        mockMvc.perform(get("/api/admin/personnel/users")
+                        .param("current", "1")
+                        .param("size", "10")
+                        .param("keyword", "小林"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[0].displayName").value("小林"))
+                .andExpect(jsonPath("$.data.records[0].enabled").value(true));
+
+        mockMvc.perform(put("/api/admin/personnel/accounts/8/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"enabled":false}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(8))
+                .andExpect(jsonPath("$.data.enabled").value(false));
+
+        verify(personnelService).updateEnabled(8L, false, "admin");
     }
 
     @Test

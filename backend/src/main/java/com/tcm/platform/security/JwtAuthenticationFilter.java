@@ -1,5 +1,8 @@
 package com.tcm.platform.security;
 
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.tcm.platform.entity.Account;
+import com.tcm.platform.mapper.AccountMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -26,9 +29,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String ROLE_PREFIX = "ROLE_";
 
     private final JwtUtil jwtUtil;
+    private final AccountMapper accountMapper;
 
-    public JwtAuthenticationFilter(JwtUtil jwtUtil) {
+    public JwtAuthenticationFilter(JwtUtil jwtUtil, AccountMapper accountMapper) {
         this.jwtUtil = jwtUtil;
+        this.accountMapper = accountMapper;
     }
 
     @Override
@@ -43,9 +48,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 && SecurityContextHolder.getContext().getAuthentication() == null
                 && jwtUtil.validateToken(token)) {
             String username = jwtUtil.extractUsername(token);
-            String role = jwtUtil.extractRole(token);
-            if (username != null && !username.isBlank() && role != null && !role.isBlank()) {
-                SimpleGrantedAuthority authority = new SimpleGrantedAuthority(toSpringRole(role));
+            Account account = findEnabledAccount(username);
+            if (account != null && account.getRole() != null && !account.getRole().isBlank()) {
+                SimpleGrantedAuthority authority = new SimpleGrantedAuthority(toSpringRole(account.getRole()));
 
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(username, null, List.of(authority));
@@ -55,6 +60,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private Account findEnabledAccount(String username) {
+        if (username == null || username.isBlank()) {
+            return null;
+        }
+        Account account = accountMapper.selectOne(
+                Wrappers.<Account>lambdaQuery().eq(Account::getUsername, username)
+        );
+        return account != null && !Boolean.FALSE.equals(account.getEnabled()) ? account : null;
     }
 
     private String extractBearerToken(HttpServletRequest request) {

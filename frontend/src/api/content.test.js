@@ -114,10 +114,12 @@ describe('content and AI API', () => {
     })
     const { getAIRecommendations } = await import('./content')
 
-    const result = await getAIRecommendations('晚饭怎么吃？')
+    const result = await getAIRecommendations({ question: '晚饭怎么吃？' })
 
     expect(request.post).toHaveBeenCalledWith('/patient/ai/recommendations', {
       question: '晚饭怎么吃？',
+      consultationId: null,
+      conversationId: null,
     })
     expect(result).toHaveLength(2)
   })
@@ -142,16 +144,59 @@ describe('content and AI API', () => {
     expect(request.delete).toHaveBeenCalledWith('/admin/knowledge/1')
   })
 
-  it('downloads consultation CSV from the plural endpoint', async () => {
+  it('updates publication without resubmitting the whole content record', async () => {
+    request.put.mockResolvedValue({ data: { code: 200, data: { id: 1, published: true } } })
+    const { updateAdminContentPublication } = await import('./content')
+
+    await updateAdminContentPublication('knowledge', 1, true)
+
+    expect(request.put).toHaveBeenCalledWith('/admin/knowledge/1/publication', {
+      published: true,
+    })
+  })
+
+  it('uploads a content cover as multipart form data', async () => {
+    request.post.mockResolvedValue({
+      data: { code: 200, data: { url: '/uploads/content/cover.png' } },
+    })
+    const { uploadAdminContentImage } = await import('./content')
+    const file = new File(['cover'], 'cover.png', { type: 'image/png' })
+
+    await uploadAdminContentImage(file)
+
+    expect(request.post).toHaveBeenCalledWith(
+      '/admin/content-images',
+      expect.any(FormData),
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    )
+    const formData = request.post.mock.calls[0][1]
+    expect(formData.get('file')).toBe(file)
+  })
+
+  it('counts and downloads filtered consultation CSV records', async () => {
     const csv = new Blob(['id,status'])
-    request.get.mockResolvedValue({ data: csv })
-    const { exportConsultations } = await import('./content')
+    request.get
+      .mockResolvedValueOnce({ data: { code: 200, data: 4 } })
+      .mockResolvedValueOnce({ data: csv })
+    const { countExportConsultations, exportConsultations } = await import('./content')
+    const filters = {
+      dateFrom: '2026-06-01',
+      dateTo: '2026-06-22',
+      status: '接诊中',
+      departmentId: 2,
+    }
 
-    const result = await exportConsultations()
+    const count = await countExportConsultations(filters)
+    const result = await exportConsultations(filters)
 
+    expect(request.get).toHaveBeenCalledWith('/admin/export/consultations/count', {
+      params: filters,
+    })
     expect(request.get).toHaveBeenCalledWith('/admin/export/consultations', {
+      params: filters,
       responseType: 'blob',
     })
+    expect(count).toBe(4)
     expect(result).toBe(csv)
   })
 
@@ -163,6 +208,10 @@ describe('content and AI API', () => {
           statusDistribution: [{ status: '待接诊', count: 2 }],
           urgencyDistribution: [{ urgency: '普通', count: 3 }],
           trendLast6Months: [{ month: '2026-06', count: 4 }],
+          metrics: { registeredPatients: 11 },
+          departmentDistribution: [{ department: '中医内科', count: 4 }],
+          doctorWorkloads: [{ doctorName: '李医生', activeCount: 2 }],
+          scope: 'platform',
         },
       },
     })
@@ -173,5 +222,28 @@ describe('content and AI API', () => {
     expect(result.statusDistribution).toEqual([{ label: '待接诊', value: 2 }])
     expect(result.urgencyDistribution).toEqual([{ label: '普通', value: 3 }])
     expect(result.trendLast6Months).toEqual([{ label: '2026-06', value: 4 }])
+    expect(result.departmentDistribution).toEqual([{ label: '中医内科', value: 4 }])
+    expect(result.doctorWorkloads).toEqual([
+      { doctorName: '李医生', activeCount: 2 },
+    ])
+    expect(result.metrics.registeredPatients).toBe(11)
+    expect(result.scope).toBe('platform')
+  })
+
+  it('loads a dashboard trend without reloading the other dashboard data', async () => {
+    request.get.mockResolvedValue({
+      data: {
+        code: 200,
+        data: [{ period: '2026-06-16', count: 5 }],
+      },
+    })
+    const { getDashboardTrend } = await import('./content')
+
+    const result = await getDashboardTrend('week')
+
+    expect(request.get).toHaveBeenCalledWith('/admin/dashboard/trend', {
+      params: { period: 'week' },
+    })
+    expect(result).toEqual([{ label: '2026-06-16', value: 5 }])
   })
 })

@@ -94,11 +94,19 @@ public class AIService {
         }
     }
 
-    public List<AIContentRecommendation> findRecommendations(String question) {
+    public List<AIContentRecommendation> findRecommendations(
+            String question,
+            Long patientAccountId,
+            Long consultationId
+    ) {
         if (!hasText(question)) {
             throw new IllegalArgumentException("问题不能为空");
         }
-        return aiContextService.findRecommendations(question.trim());
+        return aiContextService.findRecommendations(
+                question.trim(),
+                patientAccountId,
+                consultationId
+        );
     }
 
     private List<AIQuestionRequest.ContextMessage> safeContext(List<AIQuestionRequest.ContextMessage> context) {

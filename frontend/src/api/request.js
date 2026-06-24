@@ -21,7 +21,9 @@ request.interceptors.request.use((config) => {
 request.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error?.response?.status === 403) {
+    const status = error?.response?.status
+
+    if (status === 401) {
       error.message = '登录已过期，请重新登录'
       clearSession(getBrowserStorage())
       ElMessage.warning('登录已过期，请重新登录')
@@ -29,6 +31,9 @@ request.interceptors.response.use(
       if (typeof window !== 'undefined' && !window.location?.pathname?.startsWith('/login')) {
         window.location.assign('/login')
       }
+    } else if (status === 403) {
+      error.message = error?.response?.data?.message || '当前账号无权执行此操作'
+      ElMessage.warning(error.message)
     }
 
     return Promise.reject(error)

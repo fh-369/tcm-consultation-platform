@@ -25,3 +25,11 @@ export async function loginAdmin(credentials) {
 export async function registerPatient(profile) {
   return unwrapResult(await request.post('/auth/register', profile))
 }
+
+export async function getDepartments() {
+  return unwrapResult(await request.get('/auth/departments'))
+}
+
+export async function applyDoctor(profile) {
+  return unwrapResult(await request.post('/auth/doctor-applications', profile))
+}

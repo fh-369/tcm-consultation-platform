@@ -133,6 +133,38 @@ class KnowledgeArticleServiceTest {
         verify(knowledgeArticleMapper).deleteById(9L);
     }
 
+    @Test
+    void updatePublicationOnlyChangesPublishedState() {
+        KnowledgeArticleService service = new KnowledgeArticleService(knowledgeArticleMapper);
+        KnowledgeArticle stored = article("睡眠节律", "正文");
+        stored.setId(12L);
+        stored.setPublished(false);
+        when(knowledgeArticleMapper.selectById(12L)).thenReturn(stored);
+        when(knowledgeArticleMapper.updateById(stored)).thenReturn(1);
+
+        KnowledgeArticle updated = service.updatePublication(12L, true);
+
+        assertThat(updated.getPublished()).isTrue();
+        assertThat(updated.getTitle()).isEqualTo("睡眠节律");
+        verify(knowledgeArticleMapper).updateById(stored);
+    }
+
+    @Test
+    void createArticleTrimsEditableTextFields() {
+        KnowledgeArticleService service = new KnowledgeArticleService(knowledgeArticleMapper);
+        when(knowledgeArticleMapper.insert(any(KnowledgeArticle.class))).thenReturn(1);
+        KnowledgeArticle article = article("  春季养生  ", "  春季养生正文  ");
+        article.setCategory("  四季养护  ");
+        article.setSummary("  适合春日阅读  ");
+
+        KnowledgeArticle created = service.createArticle(article);
+
+        assertThat(created.getTitle()).isEqualTo("春季养生");
+        assertThat(created.getContent()).isEqualTo("春季养生正文");
+        assertThat(created.getCategory()).isEqualTo("四季养护");
+        assertThat(created.getSummary()).isEqualTo("适合春日阅读");
+    }
+
     private KnowledgeArticle article(String title, String content) {
         KnowledgeArticle article = new KnowledgeArticle();
         article.setTitle(title);

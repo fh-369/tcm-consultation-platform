@@ -3,6 +3,7 @@ package com.tcm.platform.entity;
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 问诊单实体（核心业务表）
@@ -16,6 +17,26 @@ public class Consultation {
     private Long id;
 
     private Long patientAccountId;
+
+    private Long departmentId;
+
+    @TableField(exist = false)
+    private String departmentName;
+
+    @TableField(exist = false)
+    private List<ConsultationProgressRecord> progressRecords;
+
+    @TableField(exist = false)
+    private Long messageCount;
+
+    @TableField(exist = false)
+    private String latestMessage;
+
+    @TableField(exist = false)
+    private String latestMessageSenderType;
+
+    @TableField(exist = false)
+    private LocalDateTime latestMessageAt;
 
     private String patientName;
 
@@ -45,7 +66,7 @@ public class Consultation {
 
     private Long doctorId;
 
-    private LocalDateTime followUpAt;
+    private LocalDateTime assignedAt;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;

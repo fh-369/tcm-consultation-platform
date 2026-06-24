@@ -8,6 +8,8 @@ import {
   removeConversation,
   removeEmptyConversations,
   summarizeConversation,
+  normalizeConversation,
+  buildLegacyImportPayload,
 } from './session'
 
 describe('AI conversation session helpers', () => {
@@ -16,6 +18,8 @@ describe('AI conversation session helpers', () => {
 
     expect(conversation.title).toBe('最近容易疲倦，怎么调整作息？')
     expect(conversation.messages).toEqual([])
+    expect(conversation.recommendations).toEqual([])
+    expect(conversation.recommendationsExpanded).toBe(false)
   })
 
   it('summarizes conversations from the first user message', () => {
@@ -59,5 +63,44 @@ describe('AI conversation session helpers', () => {
 
     expect(result.conversations).toEqual([second])
     expect(result.activeId).toBe(second.id)
+  })
+
+  it('normalizes persisted conversations with collapsed recommendations', () => {
+    const conversation = normalizeConversation({
+      id: 12,
+      title: '睡眠调养',
+      consultationId: 9,
+      recommendationInitialized: true,
+      recommendations: [{ id: 3, type: 'knowledge', title: '睡眠建议' }],
+      messages: [{ id: 8, role: 'user', content: '最近睡不好' }],
+      messageTotal: 1,
+      hasMoreMessages: false,
+    })
+
+    expect(conversation.persisted).toBe(true)
+    expect(conversation.recommendationsExpanded).toBe(false)
+    expect(conversation.consultationId).toBe(9)
+    expect(conversation.messages[0].streaming).toBe(false)
+  })
+
+  it('builds a one-time legacy import payload from message recommendations', () => {
+    const conversation = createConversation('旧对话')
+    conversation.messages = [
+      createUserMessage('最近睡不好'),
+      {
+        ...createAssistantMessage('可以先固定作息。'),
+        recommendations: [
+          { id: 3, type: 'knowledge', title: '睡眠建议', description: '固定作息' },
+          { id: 7, type: 'recipe', title: '测试药膳', description: '不再迁移' },
+        ],
+      },
+    ]
+
+    const payload = buildLegacyImportPayload(conversation)
+
+    expect(payload.messages).toHaveLength(2)
+    expect(payload.recommendations).toEqual([
+      { id: 3, type: 'knowledge', title: '睡眠建议', description: '固定作息' },
+    ])
   })
 })
