@@ -1,480 +1,389 @@
-# 中医问诊与养生平台项目说明报告
+# 知身问养项目完整说明报告
 
-## 0. 当前仓库结构
-
-项目目前采用前后端一体仓库结构：
-
-```text
-tcm-consultation-platform/
-├─ backend/   当前 Spring Boot 后端 Starter
-├─ frontend/  前端项目预留目录
-├─ docs/      项目说明与实战指南
-└─ README.md  仓库总说明
-```
-
-当前实际业务代码位于 `backend/src/main`，测试代码将位于 `backend/src/test`。`src/test` 是 Maven 标准结构的一部分，不是冗余目录。
-
-前端尚未初始化，因为当前任务书主要定义了后端 API。后续确定前端技术栈和页面范围后，再在 `frontend` 中创建项目。
+> 报告日期：2026 年 6 月 24 日
 
 ## 1. 项目概述
 
-中医问诊与养生平台是一个基于 Spring Boot 的后端 Web 应用实践项目。它面向中医问诊、健康养生内容管理和后台运营管理场景，目标是让患者能够在线提交问诊信息，让医生或管理员能够处理问诊单、维护中医知识文章和药膳推荐，并通过 Dashboard 查看业务统计数据。
+知身问养是一个面向中医问诊与日常养护场景的全栈 Web 平台。项目围绕“用户提交问诊、医生接诊处理、管理员运营调度、内容科普辅助、AI 养护问答”构建完整业务闭环。
 
-从课程实践角度看，这个项目不是一个简单的 CRUD 练习，而是一个综合型 Java 企业应用训练项目。它覆盖后端开发中常见的能力：项目初始化、数据库建模、用户认证、权限控制、业务分层、数据查询、接口设计、异常处理、AI 服务集成、测试和 Docker 部署。
+平台不是单纯的 CRUD 示例，而是一个包含账号认证、角色权限、科室分诊、多医生工作台、内容管理、数据导出、AI 对话持久化和前端体验设计的综合实践项目。
 
-## 2. 项目建设目标
+## 2. 当前项目状态
 
-项目最终希望实现以下目标：
+截至 2026 年 6 月 24 日，项目已经完成：
 
-1. 搭建一个结构清晰的 Spring Boot 后端项目。
-2. 使用 MyBatis-Plus 完成 MySQL 数据库持久化。
-3. 使用 JWT 和 Spring Security 实现登录认证与角色权限控制。
-4. 实现患者端、医生端和管理员端的核心业务接口。
-5. 提供中医知识文章、药膳推荐、问诊单管理等业务能力。
-6. 接入 AI 问答能力，提供基础中医养生问答服务。
-7. 提供 Dashboard 统计和问诊单 CSV 导出能力。
-8. 完成基础测试、Docker 部署和最终交付材料。
+- Spring Boot 后端基础与核心业务接口
+- Vue 3 前端用户端、医生端、管理员端页面
+- MySQL 数据建模与业务持久化
+- JWT 登录认证与角色权限
+- 多医生与科室分诊体系
+- 问诊处理流程与医患沟通
+- 养生文章与药膳推荐内容管理
+- Dashboard 统计与 CSV 导出
+- DashScope AI 问答与数据库持久化
+- 自动化测试与生产构建验收
 
-## 3. 用户角色
+当前项目已经从早期教学骨架升级为一个可本地运行、可演示完整业务流程的全栈项目。
 
-系统计划支持 3 类角色。
-
-| 角色 | 说明 | 主要权限 |
-| --- | --- | --- |
-| 患者 Patient | 使用患者端功能的普通用户 | 注册、登录、提交问诊单、查看自己的问诊记录、浏览知识文章、浏览药膳推荐、使用 AI 问答 |
-| 医生 Doctor | 后台处理问诊业务的用户 | 登录后台、查看问诊单、更新问诊状态、管理知识文章、管理药膳、查看 Dashboard、导出数据 |
-| 管理员 Admin | 系统最高权限用户 | 拥有医生权限，并可作为系统管理角色使用 |
-
-当前设计中，医生和管理员存放在 `users` 表中，患者存放在 `patient_accounts` 表中。
-
-## 4. 核心业务范围
-
-### 4.1 认证与账号业务
-
-认证模块负责处理系统登录、注册和 token 生成。
-
-计划实现的能力：
-
-- 患者注册
-- 患者登录
-- 医生/管理员登录
-- BCrypt 密码加密
-- JWT token 生成
-- JWT token 校验
-- 根据角色控制接口访问权限
-
-对应接口规划：
-
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| POST | `/api/auth/register` | 患者注册 |
-| POST | `/api/auth/login/patient` | 患者登录 |
-| POST | `/api/auth/login/admin` | 医生/管理员登录 |
-
-业务意义：
-
-这是系统所有后续业务的入口。没有认证模块，系统无法区分患者、医生和管理员，也无法控制不同接口的访问权限。
-
-### 4.2 患者问诊业务
-
-问诊业务是本项目的核心业务。
-
-患者可以提交问诊单，填写姓名、年龄、性别、手机号、症状描述、持续时间、过敏史、紧急程度和备注等信息。系统保存问诊单后，医生或管理员可以在后台查看、筛选和处理这些问诊单。
-
-计划实现的能力：
-
-- 患者提交问诊单
-- 患者查看自己的问诊记录
-- 后台分页查询问诊单
-- 按状态筛选问诊单
-- 按紧急程度筛选问诊单
-- 按姓名、症状、手机号进行关键字搜索
-- 医生更新问诊状态
-- 医生填写处理备注
-- 记录跟进时间
-
-对应接口规划：
-
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| POST | `/api/patient/consultation` | 患者提交问诊单 |
-| GET | `/api/patient/consultation/my` | 患者查看自己的问诊记录 |
-| GET | `/api/admin/consultation` | 后台查询问诊单 |
-| PUT | `/api/admin/consultation/{id}` | 后台更新问诊单 |
-
-业务意义：
-
-问诊单连接患者端和医生端，是整个平台的数据中心。后续的提醒规则、Dashboard 统计、CSV 导出都围绕问诊单展开。
-
-### 4.3 问诊提醒业务
-
-提醒业务根据问诊单内容生成辅助提醒。
-
-计划实现的规则包括：
-
-- 如果紧急程度是“非常紧急”，提醒医生优先查看。
-- 如果症状包含“发热”“胸痛”“呼吸困难”等关键词，提示及时就医。
-- 如果症状包含“失眠”，给出睡眠相关建议。
-- 如果症状包含“胃痛”“脾胃”，给出饮食调理提示。
-- 如果持续时间包含“周”“月”，提示病程较长，需要重点关注。
-- 根据规则生成 `reminderLevel`，例如 `normal`、`attention`、`urgent`。
-- 根据等级生成下一次跟进时间。
-
-业务意义：
-
-该模块让问诊单不只是被动存储数据，而是能够根据症状信息生成简单的业务判断，为医生处理问诊提供辅助。
-
-### 4.4 中医知识文章业务
-
-知识文章模块用于维护和展示中医健康知识。
-
-计划实现的能力：
-
-- 患者端浏览已发布文章
-- 后台查看所有文章
-- 后台新增文章
-- 后台编辑文章
-- 后台删除文章
-- 按分类筛选
-- 区分草稿和已发布状态
-- 记录浏览量
-
-对应接口规划：
-
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| GET | `/api/patient/knowledge` | 患者端查看已发布文章 |
-| GET | `/api/admin/knowledge` | 后台查看文章列表 |
-| POST | `/api/admin/knowledge` | 后台新增文章 |
-| PUT | `/api/admin/knowledge/{id}` | 后台更新文章 |
-| DELETE | `/api/admin/knowledge/{id}` | 后台删除文章 |
-
-业务意义：
-
-知识文章模块让平台不仅能处理问诊，还能提供健康科普内容，增强平台的养生服务属性。
-
-### 4.5 药膳推荐业务
-
-药膳模块用于维护和展示养生食疗推荐内容。
-
-计划实现的能力：
-
-- 患者端浏览已发布药膳
-- 按季节筛选药膳
-- 按体质筛选药膳
-- 后台新增药膳
-- 后台编辑药膳
-- 后台删除药膳
-- 区分草稿和已发布状态
-- 记录浏览量
-
-对应接口规划：
-
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| GET | `/api/patient/recipe` | 患者端查看药膳推荐 |
-| GET | `/api/admin/recipe` | 后台查看药膳列表 |
-| POST | `/api/admin/recipe` | 后台新增药膳 |
-| PUT | `/api/admin/recipe/{id}` | 后台更新药膳 |
-| DELETE | `/api/admin/recipe/{id}` | 后台删除药膳 |
-
-业务意义：
-
-药膳推荐是中医养生平台的重要业务内容，和知识文章一起构成平台的健康内容服务。
-
-### 4.6 Dashboard 统计业务
-
-Dashboard 模块用于后台查看系统运营数据。
-
-计划统计内容：
-
-- 问诊单总数
-- 待处理问诊单数量
-- 知识文章数量
-- 药膳数量
-- 问诊状态分布
-- 紧急程度分布
-- 最近 6 个月问诊趋势
-
-对应接口规划：
-
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| GET | `/api/admin/dashboard` | 后台 Dashboard 统计 |
-
-业务意义：
-
-Dashboard 能帮助医生或管理员快速了解平台当前运行情况，例如问诊压力、紧急问诊数量、内容建设情况等。
-
-### 4.7 数据导出业务
-
-数据导出模块用于将问诊单导出为 CSV 文件。
-
-计划实现的能力：
-
-- 导出问诊单列表
-- 设置正确的响应头
-- 使用 OpenCSV 生成 CSV 内容
-- 支持后台用户下载数据
-
-对应接口规划：
-
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| GET | `/api/admin/export/consultation` | 导出问诊单 CSV |
-
-业务意义：
-
-导出能力适合课程验收、后台统计和离线分析场景。它也体现了后端处理文件响应的能力。
-
-### 4.8 AI 问答业务
-
-AI 模块计划接入阿里云 DashScope 的 Qwen 模型，为用户提供中医养生相关问答。
-
-计划实现的能力：
-
-- 接收用户问题
-- 调用 DashScope API
-- 返回 AI 回答
-- 当 API Key 未配置或调用失败时，返回 fallback 预设回答
-- 标识回答模式，例如 `ai` 或 `fallback`
-
-对应接口规划：
-
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| POST | `/api/ai/ask` | AI 问答 |
-
-业务意义：
-
-AI 问答是项目的高级功能。它让平台从传统 CRUD 系统扩展到智能问答场景，同时训练外部 API 调用、配置管理和降级处理能力。
-
-## 5. 系统模块划分
-
-项目计划按照以下包结构组织代码：
+## 3. 技术架构
 
 ```text
-com.tcm.platform
-├─ ai          AI 服务集成
-├─ common      通用响应和异常处理
-├─ config      Spring、Security、MyBatis、Web 配置
-├─ controller  HTTP 接口控制器
-├─ dto         请求和响应数据对象
-├─ entity      数据库实体类
-├─ mapper      MyBatis-Plus 数据访问接口
-├─ security    JWT、认证过滤器、安全上下文
-└─ service     业务服务
-```
-
-### 5.1 Controller 层
-
-Controller 层负责接收 HTTP 请求、读取参数、触发参数校验，并调用 Service 层处理业务。
-
-计划中的 Controller：
-
-| Controller | 说明 |
-| --- | --- |
-| `AuthController` | 登录、注册接口 |
-| `PatientController` | 患者端接口 |
-| `AdminController` | 后台管理接口 |
-| `AIController` | AI 问答接口 |
-
-### 5.2 Service 层
-
-Service 层负责业务逻辑，是系统最核心的代码层。
-
-计划中的 Service：
-
-| Service | 说明 |
-| --- | --- |
-| `AuthService` | 登录、注册、密码校验、token 生成 |
-| `ConsultationService` | 问诊单创建、查询、更新、统计 |
-| `ReminderService` | 问诊提醒规则 |
-| `KnowledgeArticleService` | 中医知识文章业务 |
-| `RecipeService` | 药膳推荐业务 |
-| `ExportService` | CSV 导出 |
-| `DashScopeService` | AI 模型调用和 fallback |
-
-### 5.3 Mapper 层
-
-Mapper 层负责数据库访问。项目使用 MyBatis-Plus，基础 CRUD 由 `BaseMapper` 提供。
-
-已有 Mapper：
-
-| Mapper | 对应实体 | 对应表 |
-| --- | --- | --- |
-| `UserMapper` | `User` | `users` |
-| `PatientAccountMapper` | `PatientAccount` | `patient_accounts` |
-| `ConsultationMapper` | `Consultation` | `consultations` |
-| `KnowledgeArticleMapper` | `KnowledgeArticle` | `knowledge_articles` |
-| `RecipeMapper` | `Recipe` | `recipes` |
-| `UploadMapper` | `Upload` | `uploads` |
-
-## 6. 数据模型说明
-
-系统当前设计了 6 张核心表。
-
-| 表名 | 业务含义 | 重要字段 |
-| --- | --- | --- |
-| `users` | 医生和管理员账号 | 用户名、密码哈希、角色、显示名称、科室 |
-| `patient_accounts` | 患者账号 | 用户名、密码哈希、昵称、手机号、头像 |
-| `consultations` | 问诊单 | 患者、姓名、年龄、性别、症状、紧急度、状态、医生备注、跟进时间 |
-| `knowledge_articles` | 中医知识文章 | 标题、分类、摘要、正文、小贴士、封面、发布状态、浏览量 |
-| `recipes` | 药膳推荐 | 名称、季节、体质、适宜人群、简介、食材、步骤、发布状态 |
-| `uploads` | 上传记录 | 原始文件名、存储文件名、文件类型、大小、访问地址、上传者 |
-
-其中 `consultations` 是核心业务表。患者端提交的数据、医生端处理的数据、Dashboard 统计和导出功能都依赖这张表。
-
-## 7. 权限设计
-
-系统使用 JWT 进行无状态认证，使用 Spring Security 控制接口访问权限。
-
-计划权限规则：
-
-| URL | 访问规则 |
-| --- | --- |
-| `/api/auth/**` | 不需要登录 |
-| `/api/patient/**` | 患者、医生、管理员可访问 |
-| `/api/admin/**` | 医生、管理员可访问 |
-| `/uploads/**` | 不需要登录 |
-| `/swagger-ui/**`、`/v3/api-docs/**` | 不需要登录 |
-| 其他接口 | 需要登录 |
-
-注意：
-
-Spring Security 中角色通常会自动带有 `ROLE_` 前缀。因此代码中配置 `hasAnyRole("PATIENT", "DOCTOR", "ADMIN")` 时，实际权限会对应 `ROLE_PATIENT`、`ROLE_DOCTOR`、`ROLE_ADMIN`。
-
-## 8. 技术架构
-
-项目使用典型的后端分层架构：
-
-```text
-客户端 / Postman / 前端页面
+浏览器 / 前端 Vue 应用
         |
         v
-Controller 层
+Axios / 路由守卫 / Pinia 状态
         |
         v
-Service 层
+Spring Boot REST API
         |
         v
-Mapper 层
+Service 业务层
+        |
+        v
+MyBatis-Plus Mapper
         |
         v
 MySQL 数据库
 ```
 
-核心技术职责：
-
-| 技术 | 职责 |
+| 层 | 技术 |
 | --- | --- |
-| Spring Boot | 启动应用、自动配置、Web 服务 |
-| Spring MVC | 提供 RESTful API |
-| Spring Security | 登录认证、接口权限控制 |
-| JWT | 保存登录状态，避免服务端 Session |
-| MyBatis-Plus | 简化数据库 CRUD |
-| MySQL | 保存业务数据 |
-| Lombok | 简化实体和 DTO 代码 |
-| OpenCSV | 生成 CSV 导出文件 |
-| RestTemplate | 调用外部 AI API |
-| Docker | 容器化运行 MySQL 和后端应用 |
+| 前端 | Vue 3, Vite, Vue Router, Pinia, Element Plus, Axios |
+| 后端 | Java 17, Spring Boot 3.2, Spring Security, MyBatis-Plus |
+| 数据库 | MySQL |
+| 认证 | JWT, BCrypt |
+| AI | DashScope OpenAI 兼容接口 |
+| 测试 | JUnit 5, Spring Boot Test, Vitest |
+| 构建 | Maven, npm |
 
-## 9. 当前项目实现状态
-
-根据当前代码目录，项目目前仍处于“任务一：项目初始化与基础框架”的初始状态。
-
-### 9.1 已经具备的内容
-
-当前已经有：
-
-- 前后端一体仓库目录结构
-- `backend/README.md` 后端任务说明
-- `docs/PROJECT_GUIDE.md` 实战引导文档
-- `backend/pom.xml` 骨架
-- `backend/src/main/resources/application.yml` 骨架
-- `backend/src/main/resources/schema.sql` 数据库脚本
-- 启动类骨架
-- `common`、`config`、`dto`、`entity`、`mapper` 等基础包
-- 6 个 Entity 类文件骨架
-- 6 个 Mapper 接口
-- 6 个 DTO 类文件骨架
-
-### 9.2 尚未完成的内容
-
-当前还没有真正完成：
-
-- `backend/pom.xml` 依赖配置
-- `backend/src/main/resources/application.yml` 配置值
-- Spring Boot 启动类逻辑
-- `Result<T>` 统一响应实现
-- 全局异常处理实现
-- Spring Security 配置实现
-- JWT 工具类和过滤器
-- 6 个实体类字段
-- DTO 参数校验注解
-- Controller 层业务接口
-- Service 层业务逻辑
-- AI 服务集成
-- Docker 部署文件
-- 单元测试和接口测试
-
-因此，当前项目还不是可运行的完整系统，而是一个教学用的后端项目骨架。
-
-## 10. 项目最终业务流程
-
-项目完成后，理想业务流程如下：
+## 4. 仓库结构
 
 ```text
-患者注册账号
-  -> 患者登录获得 JWT
-  -> 患者提交问诊单
-  -> 系统根据症状生成提醒
-  -> 医生或管理员登录后台
-  -> 后台查看问诊单列表
-  -> 医生筛选紧急问诊
-  -> 医生更新问诊状态和备注
-  -> 后台查看 Dashboard 统计
-  -> 后台导出问诊数据
-  -> 患者浏览知识文章和药膳推荐
-  -> 用户使用 AI 问答获取养生建议
+tcm-consultation-platform/
+├─ backend/
+│  ├─ pom.xml
+│  ├─ README.md
+│  └─ src/
+│     ├─ main/
+│     └─ test/
+├─ frontend/
+│  ├─ package.json
+│  ├─ vite.config.js
+│  ├─ README.md
+│  └─ src/
+├─ docs/
+│  ├─ PROJECT_DESCRIPTION_REPORT.md
+│  ├─ PROJECT_DEVELOPMENT_REPORT.md
+│  └─ CONTENT_SOURCE_AND_PRODUCT_ROADMAP.md
+├─ AGENTS.md
+└─ README.md
 ```
 
-## 11. 项目学习价值
+说明：
 
-这个项目适合用来训练以下能力：
+- `backend/src/main` 是后端正式代码。
+- `backend/src/test` 是后端自动化测试。
+- `frontend/src` 是前端正式代码。
+- `frontend/dist` 是构建产物，不提交到 Git。
+- `backend/target` 是 Maven 构建产物，不提交到 Git。
+- `uploads` 是运行期上传文件目录，不提交到 Git。
 
-- Java 后端项目结构理解
-- Maven 依赖管理
-- Spring Boot 配置和启动
-- RESTful API 设计
-- DTO、Entity、Mapper 的分工
-- MyBatis-Plus 基础使用
-- MySQL 表结构和实体映射
-- JWT 登录认证
-- Spring Security 权限控制
-- 参数校验和统一异常处理
-- 分页查询和动态筛选
-- CSV 文件导出
-- 外部 AI API 调用
-- Docker 部署
-- 接口测试和项目交付
+## 5. 用户角色
 
-## 12. 后续新增功能规划建议
-
-在设计新增功能之前，建议先把新增功能分成 3 类：
-
-| 类型 | 说明 | 示例 |
+| 角色 | 说明 | 核心能力 |
 | --- | --- | --- |
-| 核心扩展 | 会影响数据库、权限或主流程，需要提前设计 | 预约挂号、医生排班、病历档案、处方管理 |
-| 中途扩展 | 依赖某个模块完成后可以加入 | 文件上传、文章收藏、药膳点赞、问诊搜索增强 |
-| 后置扩展 | 主项目完成后再做更稳 | 在线聊天、消息通知、数据可视化大屏、多端前端页面 |
+| 普通用户 | 面向大众使用者 | 注册登录、创建问诊、查看医生回复、浏览知识和药膳、使用 AI 问答 |
+| 医生 | 平台审核通过的问诊处理者 | 查看科室问诊池、认领问诊、处理我的问诊、填写回复和更新状态 |
+| 管理员 | 平台运营与调度角色 | 管理用户和医生、审核医生申请、调度问诊、维护内容、查看统计、导出数据 |
 
-建议下一步先不要直接改 `PROJECT_GUIDE.md`，而是先生成一份 `FEATURE_BACKLOG.md`，列出想加入的新增业务，再判断哪些需要提前进入主路线，哪些可以作为 Day 22 之后的扩展任务。
+当前系统采用全局账号表 `accounts` 统一用户名唯一性，再通过 `users` 和 `patient_accounts` 承载医生/管理员与普通用户资料。
 
-## 13. 总结
+## 6. 核心业务模块
 
-中医问诊与养生平台当前定位是一个“中医问诊 + 健康内容 + 后台管理 + AI 问答”的综合后端项目。
+### 6.1 认证与账号
 
-它的主线业务是患者提交问诊单，医生或管理员处理问诊单；辅助业务是知识文章、药膳推荐、Dashboard 统计、CSV 导出和 AI 问答。
+功能：
 
-当前代码还是基础骨架，适合从 Day 1 开始一步一步实现。等你理解清楚原始业务后，再规划新增功能，会比一开始盲目扩展更稳。
+- 普通用户注册和登录
+- 医生入驻申请
+- 管理员和医生后台登录
+- BCrypt 密码加密
+- JWT 生成与校验
+- 登录过期后自动清理前端状态
+- 全局用户名唯一
+
+关键接口：
+
+- `POST /api/auth/register`
+- `POST /api/auth/login/patient`
+- `POST /api/auth/login/admin`
+- `POST /api/auth/doctor/apply`
+- `GET /api/auth/departments`
+
+### 6.2 科室与医生准入
+
+功能：
+
+- 建立科室主数据
+- 医生注册时选择负责科室
+- 管理员审核医生入驻申请
+- 医生审核通过后才能进入工作台
+- 管理员查看和管理医生账号状态
+
+当前科室：
+
+- 综合咨询
+- 中医内科
+- 中医妇科
+- 中医儿科
+- 针灸推拿科
+
+### 6.3 用户问诊
+
+功能：
+
+- 用户创建问诊单
+- 选择问诊科室
+- 填写姓名、年龄、性别、手机号、症状、持续时间、过敏史、备注和紧急程度
+- 前后端校验姓名、手机号、性别和必填项
+- 系统生成提醒信息
+- 用户查看自己的问诊列表、处理进度和医生回复
+- 医生未完成问诊前，用户可以补充回复
+
+### 6.4 医生工作台
+
+功能：
+
+- 科室问诊池：展示本科室和综合咨询中可认领的问诊
+- 我的问诊：展示已分配或已认领给当前医生的问诊
+- 医生认领问诊
+- 医生填写回复
+- 医生更新问诊状态
+- 医生查看患者补充信息
+
+设计边界：
+
+- 科室问诊池只用于筛选和认领。
+- 问诊回复只在“我的问诊”中进行。
+- 当前版本不实现复杂排班和排班日历。
+
+### 6.5 管理员调度
+
+功能：
+
+- 查看全平台问诊
+- 按科室、医生、状态、紧急度筛选
+- 修改问诊科室
+- 分配或重新分配医生
+- 查看问诊处理状态
+- 统一调度待接诊、接诊中和已完成问诊
+
+### 6.6 养生知识
+
+功能：
+
+- 用户浏览已发布文章
+- 按分类筛选
+- 关键词搜索
+- 文章详情 Markdown 渲染
+- 浏览量统计
+- 管理员新增、编辑、发布、下架文章
+- 管理员维护文章封面和摘要
+
+### 6.7 药膳推荐
+
+功能：
+
+- 用户浏览已发布药膳
+- 按季节筛选
+- 按体质筛选
+- 关键词搜索
+- 药膳详情展示食材、步骤、适宜人群和说明
+- 浏览量统计
+- 管理员新增、编辑、发布、下架药膳
+
+### 6.8 数据统计与导出
+
+功能：
+
+- 平台数据概览
+- 问诊趋势统计
+- 状态与紧急程度统计
+- 内容数量统计
+- 按条件查询可导出问诊数量
+- 导出 CSV
+
+导出数据可能包含个人信息，真实部署时应增加操作审计和更严格的权限控制。
+
+### 6.9 AI 养护问答
+
+功能：
+
+- DashScope OpenAI 兼容接口接入
+- 模型名称通过环境变量配置
+- 支持流式回答体验
+- 支持多轮对话
+- 支持选择问诊单作为上下文
+- 对话和消息保存到数据库
+- 删除对话时同步删除数据库记录
+- 每个对话首次提问时生成站内延伸阅读推荐快照
+- 延伸阅读默认折叠，用户需要时展开
+
+当前 AI 回答定位为一般养护参考，不能替代医生诊断和治疗。
+
+## 7. 数据模型
+
+当前核心表：
+
+| 表名 | 说明 |
+| --- | --- |
+| `accounts` | 全局登录账号，保证用户名唯一 |
+| `users` | 管理员和医生资料 |
+| `patient_accounts` | 普通用户资料 |
+| `departments` | 科室主数据 |
+| `consultations` | 问诊单 |
+| `consultation_messages` | 医患沟通消息 |
+| `consultation_progress_records` | 问诊处理记录 |
+| `knowledge_articles` | 养生知识文章 |
+| `recipes` | 药膳推荐 |
+| `uploads` | 上传文件记录 |
+| `ai_conversations` | AI 对话 |
+| `ai_messages` | AI 对话消息 |
+| `ai_conversation_recommendations` | AI 对话站内推荐快照 |
+
+核心关系：
+
+- `accounts` 与 `users` / `patient_accounts` 一对一。
+- `consultations` 关联普通用户、科室和医生。
+- `consultation_messages` 和 `consultation_progress_records` 关联问诊单。
+- `ai_conversations` 关联普通用户，可选关联问诊单。
+- `ai_messages` 和 `ai_conversation_recommendations` 关联 AI 对话。
+
+## 8. 权限设计
+
+系统使用 JWT 无状态认证。
+
+主要访问规则：
+
+| 范围 | 权限 |
+| --- | --- |
+| 认证接口 | 未登录可访问 |
+| 普通用户端接口 | 普通用户登录后访问 |
+| 医生工作台接口 | 医生或管理员访问，按业务进一步限制 |
+| 管理员接口 | 管理员访问 |
+| 内容浏览接口 | 普通用户、医生、管理员可访问 |
+| 上传文件访问 | 按静态资源方式访问 |
+
+前端通过路由守卫控制页面访问，后端通过 Spring Security 和业务层校验控制接口访问。
+
+## 9. 本地演示数据
+
+当前本地演示数据已清理测试用户和历史问诊，保留管理员、科室、内容数据，并创建 5 个医生账号。
+
+| 用户名 | 医生姓名 | 科室 |
+| --- | --- | --- |
+| `doctor_general` | 林安和 | 综合咨询 |
+| `doctor_internal` | 周明远 | 中医内科 |
+| `doctor_gynecology` | 许清岚 | 中医妇科 |
+| `doctor_pediatrics` | 陈知夏 | 中医儿科 |
+| `doctor_tuina` | 何砚秋 | 针灸推拿科 |
+
+本地演示初始密码：
+
+```text
+doctor123456
+```
+
+该密码仅用于本地演示，不应作为生产密码。
+
+## 10. 运行与配置
+
+### 10.1 后端环境变量
+
+| 变量 | 说明 |
+| --- | --- |
+| `DB_USERNAME` | MySQL 用户名 |
+| `DB_PASSWORD` | MySQL 密码 |
+| `JWT_SECRET` | JWT 签名密钥 |
+| `DASHSCOPE_API_KEY` | DashScope API Key |
+| `DASHSCOPE_MODEL` | DashScope 模型名称 |
+
+### 10.2 后端启动
+
+```powershell
+cd backend
+mvn spring-boot:run
+```
+
+### 10.3 前端启动
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+## 11. 测试与验收
+
+当前第 8 阶段验收结果：
+
+| 验收项 | 命令 | 结果 |
+| --- | --- | --- |
+| 后端全量测试 | `mvn test` | 129 个测试通过，0 失败 |
+| 前端单元测试 | `npm test -- --run` | 21 个测试文件、81 个测试通过 |
+| 前端生产构建 | `npm run build` | 构建成功 |
+| Git 空白检查 | `git diff --check` | 通过 |
+
+## 12. 轻量化部署建议
+
+如果后续要创建轻量部署文件夹，只建议放运行所需内容：
+
+```text
+tcm-platform-release/
+├─ backend/
+│  ├─ tcm-platform-1.0.0.jar
+│  └─ uploads/
+├─ frontend/
+│  └─ dist/
+├─ database/
+│  ├─ schema.sql
+│  └─ migration/
+└─ README_DEPLOY.md
+```
+
+部署包不应包含：
+
+- `.git`
+- `node_modules`
+- `frontend/.vite`
+- `backend/target` 中除 jar 之外的构建缓存
+- 本地 `.env`
+- 数据库备份
+- 本地 IDE 配置
+- 开发过程临时文件
+
+## 13. 当前限制与后续方向
+
+当前限制：
+
+- Docker 和生产部署尚未正式实施。
+- AI 联网搜索尚未实现。
+- AI 推荐仍以关键词和站内内容匹配为主，后续可升级为全文检索或向量检索。
+- 生产构建主 chunk 偏大，后续可做代码拆分。
+- 内容来源体系仍需进一步规范。
+- 当前演示医生使用统一临时密码，正式环境应增加密码修改或重置机制。
+
+后续建议：
+
+- 完成 PR 合并并同步本地 `main`。
+- 重新注册普通用户，验证完整业务闭环。
+- 建立内容来源字段和书目骨架。
+- 设计生产部署方案。
+- 增加数据备份、操作审计和安全配置。
+
+## 14. 相关文档
+
+- `docs/PROJECT_DEVELOPMENT_REPORT.md`：项目阶段开发报告
+- `docs/CONTENT_SOURCE_AND_PRODUCT_ROADMAP.md`：内容来源体系与产品路线
+- `docs/FRONTEND_PLAN.md`：前端规划记录
+- `docs/中医问诊与养生平台_Git与GitHub双线实战指南.md`：Git 与 GitHub 实战指南
