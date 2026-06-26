@@ -1,5 +1,7 @@
 USE tcm_platform;
 
+SET NAMES utf8mb4;
+
 ALTER TABLE knowledge_articles MODIFY COLUMN tips TEXT COMMENT '小贴士';
 
 DELETE FROM knowledge_articles WHERE id IN (3, 4, 5);

@@ -3,6 +3,8 @@
 -- 任务一：执行此脚本初始化数据库
 -- ============================================
 
+SET NAMES utf8mb4;
+
 CREATE DATABASE IF NOT EXISTS tcm_platform
     DEFAULT CHARACTER SET utf8mb4
     DEFAULT COLLATE utf8mb4_unicode_ci;

@@ -84,7 +84,7 @@ describe('content and AI API', () => {
     })
 
     expect(fetch).toHaveBeenCalledWith(
-      'http://localhost:8080/api/patient/ai/question/stream',
+      '/api/patient/ai/question/stream',
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({
